@@ -50,33 +50,56 @@
 				</div>
 			</section>
 
-			<!-- Section Cagnotte -->
-			<section id="cagnotte" class="spotlight style2 right">
-				<span class="image fit main"><img src="images/pic03.jpg" alt="Cagnotte" /></span>
-				<div class="content">
-					<header>
-						<h2>Soutenez la cagnotte</h2>
-						<p>Participez pour aider notre ami dans son projet personnel.</p>
-					</header>
-					<p>Chaque contribution compte et nous aide à financer les différentes étapes de son parcours.</p>
-					<ul class="actions">
-						<li><a href="https://www.leetchi.com/fr/c/conversion-theo-1958171?utm_source=copylink&utm_medium=social_sharing&fbclid=PAY2xjawIlcCBleHRuA2FlbQIxMQABpsuRfaTy5J89nynmI2mcYubL1AVPtnsN5V-Azm0u0KJ231vh6yqy_VuNJQ_aem_QKkrx9uKD2PPpi4zz_xm8Q" class="button primary">Participer</a></li>
-					</ul>
-				</div>
-			</section>
+<!-- Section Cagnotte -->
+<section id="cagnotte" class="spotlight style2 right">
+  <div class="content">
+    <header>
+      <h2>Soutenez la cagnotte</h2>
+      <p>Participez pour aider notre ami dans son projet personnel.</p>
+    </header>
 
-			<section id="cagnotte" class="spotlight style2 right">
-    			<div class="content">
-      				<header>
-        				<h2>Soutenez la cagnotte</h2>
-      				</header>
-      				<iframe 
-        			src="https://www.leetchi.com/fr/c/conversion-theo-1958171" 
-        			width="100%" height="500" frameborder="0" 
-        			style="border:none; overflow:hidden;">
-      				</iframe>
-    			</div>
-			</section>
+    <p>Chaque contribution compte et nous aide à financer les différentes étapes de son parcours.</p>
+
+    <!-- Montant -->
+    <div style="margin-top: 1em;">
+      <strong id="montant">2,50 €</strong> récoltés sur <strong>900 000 €</strong>
+      <div style="
+        background-color: #333;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 12px;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        width: 100%;
+      ">
+        <!-- Barre de progression -->
+        <div id="progress-bar" style="
+          background: linear-gradient(90deg, #f9d423, #ff4e50);
+          height: 100%;
+          width: calc((2.5 / 900000) * 100%);
+          transition: width 0.5s ease;
+        "></div>
+      </div>
+      <p style="font-size: 0.9em; color: #aaa;">Objectif : 900 000 €</p>
+    </div>
+
+    <!-- Bouton -->
+    <ul class="actions" style="margin-top: 1em;">
+      <li><a href="https://www.leetchi.com/fr/c/conversion-theo-1958171" class="button primary" target="_blank">Participer</a></li>
+    </ul>
+  </div>
+</section>
+
+<script>
+  // 🧮 Pour mettre à jour facilement plus tard :
+  const montant = 2.5; // ← Remplace ici le montant actuel en euros
+  const objectif = 900000;
+  const pourcentage = (montant / objectif) * 100;
+
+  document.getElementById("montant").textContent = montant.toLocaleString('fr-FR', {minimumFractionDigits: 2}) + " €";
+  document.getElementById("progress-bar").style.width = `${pourcentage}%`;
+</script>
+
 
 			<!-- Section Contact -->
 			<section id="contact" class="wrapper style1 special fade-up">
