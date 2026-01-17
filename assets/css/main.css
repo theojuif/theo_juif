@@ -4109,3 +4109,11 @@ input, select, textarea {
 					}
 
 	}
+.image.left {
+  width: 170px;
+}
+
+.image.left img {
+  width: 100%;
+  height: auto;
+}
