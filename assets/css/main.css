@@ -4111,6 +4111,7 @@ input, select, textarea {
 	}
 .image.left {
   width: 170px;
+  border: 3px solid red;
 }
 
 .image.left img {
