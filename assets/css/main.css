@@ -4125,3 +4125,7 @@ input, select, textarea {
   width: 100%;
   height: auto;
 }
+.duolingo-number {
+  color: #e44c65;
+  font-weight: bold;
+}
