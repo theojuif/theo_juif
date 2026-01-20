@@ -4117,3 +4117,11 @@ input, select, textarea {
   width: 100%;
   height: auto;
 }
+.image.right {
+  width: 163px;
+}
+
+.image.right img {
+  width: 100%;
+  height: auto;
+}
