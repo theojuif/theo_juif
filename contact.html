@@ -1,80 +1,325 @@
 <!DOCTYPE HTML>
-<!--
-	Landed by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
 <html>
 <head>
-	<title>Contact et Partenaires</title>
+	<title>Contact & Partenaires — Théo Juif</title>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<link rel="stylesheet" href="assets/css/main.css" />
 	<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	<link rel="icon" href="images/favicon.ico" type="image/x-icon" />
+	<style>
+		/* ─── Contact Cards ─────────────────────────────────────────── */
+		.contact-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 1.8em;
+			margin-top: 2.5em;
+		}
+
+		.contact-card {
+			background: rgba(255, 255, 255, 0.04);
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			border-radius: 12px;
+			padding: 2em 1.5em;
+			text-align: center;
+			transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+			text-decoration: none;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 0.7em;
+			color: inherit;
+		}
+
+		.contact-card:hover {
+			transform: translateY(-5px);
+			background: rgba(255, 255, 255, 0.08);
+			border-color: rgba(255, 255, 255, 0.2);
+		}
+
+		/* Couleurs par réseau */
+		.contact-card.instagram:hover { border-color: #e1306c; box-shadow: 0 8px 30px rgba(225,48,108,0.18); }
+		.contact-card.tiktok:hover    { border-color: #69c9d0; box-shadow: 0 8px 30px rgba(105,201,208,0.18); }
+		.contact-card.youtube:hover   { border-color: #ff0000; box-shadow: 0 8px 30px rgba(255,0,0,0.18); }
+		.contact-card.email:hover     { border-color: #a8d8ea; box-shadow: 0 8px 30px rgba(168,216,234,0.18); }
+
+		.contact-card .icon-wrap {
+			font-size: 2.4em;
+			line-height: 1;
+		}
+		.contact-card .icon-wrap .fa-instagram { color: #e1306c; }
+		.contact-card .icon-wrap .fa-tiktok    { color: #69c9d0; }
+		.contact-card .icon-wrap .fa-youtube   { color: #ff0000; }
+		.contact-card .icon-wrap .fa-envelope  { color: #a8d8ea; }
+
+		.contact-card .network-name {
+			font-size: 1em;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: #fff;
+			margin: 0;
+		}
+
+		.contact-card .username {
+			font-size: 0.95em;
+			color: rgba(255,255,255,0.55);
+			margin: 0;
+			word-break: break-all;
+		}
+
+		.contact-card .cta-label {
+			margin-top: 0.4em;
+			font-size: 0.78em;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+			color: rgba(255,255,255,0.3);
+			transition: color 0.2s;
+		}
+		.contact-card:hover .cta-label {
+			color: rgba(255,255,255,0.7);
+		}
+
+		/* ─── Partner Section ───────────────────────────────────────── */
+		.partner-block {
+			margin-top: 5em;
+			padding-top: 3.5em;
+			border-top: 1px solid rgba(255, 255, 255, 0.08);
+		}
+
+		.partner-card {
+			display: flex;
+			align-items: center;
+			gap: 3em;
+			background: rgba(255, 255, 255, 0.04);
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			border-radius: 14px;
+			padding: 2.5em 3em;
+			margin-top: 2.5em;
+			transition: background 0.25s ease, border-color 0.25s ease;
+		}
+
+		.partner-card:hover {
+			background: rgba(255, 255, 255, 0.07);
+			border-color: rgba(105, 201, 208, 0.3);
+		}
+
+		.partner-logo-wrap {
+			flex-shrink: 0;
+			width: 90px;
+			height: 90px;
+			background: linear-gradient(135deg, #1a2a2a, #0d1f1f);
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 2.6em;
+			border: 2px solid rgba(105, 201, 208, 0.3);
+		}
+
+		.partner-info {
+			flex: 1;
+		}
+
+		.partner-info h3 {
+			margin: 0 0 0.4em 0;
+			font-size: 1.35em;
+			color: #fff;
+		}
+
+		.partner-info p {
+			margin: 0 0 1.2em 0;
+			color: rgba(255, 255, 255, 0.6);
+			font-size: 0.95em;
+			line-height: 1.6;
+		}
+
+		.partner-links {
+			display: flex;
+			gap: 1em;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		.partner-links .button {
+			margin: 0;
+		}
+
+		.partner-links .insta-link {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4em;
+			color: rgba(255,255,255,0.5);
+			font-size: 0.85em;
+			letter-spacing: 0.06em;
+			text-decoration: none;
+			transition: color 0.2s;
+		}
+		.partner-links .insta-link:hover {
+			color: #e1306c;
+		}
+		.partner-links .insta-link .fa-instagram {
+			font-size: 1.1em;
+		}
+
+		/* ─── Responsive ────────────────────────────────────────────── */
+		@media (max-width: 768px) {
+			.partner-card {
+				flex-direction: column;
+				text-align: center;
+				padding: 2em 1.5em;
+				gap: 1.5em;
+			}
+			.partner-links {
+				justify-content: center;
+			}
+			.contact-grid {
+				grid-template-columns: 1fr 1fr;
+			}
+		}
+
+		@media (max-width: 480px) {
+			.contact-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
 </head>
-	<body class="is-preload">
-		<div id="page-wrapper">
+<body class="is-preload">
+	<div id="page-wrapper">
 
-			<!-- Header -->
-			<header id="header">
-				<h1 id="logo"><a href="index.html">Théo Juif</a></h1>
-				<nav id="nav">
-					<ul>
-						<li><a href="projet.html">Notre projet</a></li>
-						<li><a href="cagnotte.html">La cagnotte</a></li>
-						<li><a href="index.html#contact">Contact</a></li>
-					</ul>
-				</nav>
-			</header>
-
-			<!-- Main -->
-			<div id="main" class="wrapper style1">
-				<div class="container">
-					<header class="major">
-						<h2>Contact et Partenaires</h2>
-						<p>Retrouvez ici toutes les manières de nous contacter, ainsi que les différents partenaires qui nous accompagnent.</p>
-					</header>
-
-					<!-- Content -->
-					<section id="content">
-						<h2>Nous contacter</h2>
-						<p style="text-align: justify;">
-							Si nous sommes aussi impliqués dans ce projet, c'est qu'il est très important pour nous de répandre la foi juive, très critiquée, surtout en ce moment. Pour cela, nous avons demandé à un ami pour combien d'argent il serait prêt à se convertir au judaïsme. Après avoir obtenu son consentement, nous voilà lancés dans une folle course pour récolter les 900 000€ demandés.
-						</p>
-						<ul class="actions special">
-  							<li><a href="cagnotte.html" class="button primary">En savoir plus</a></li>
-						</ul>
-						<h2>Nos actions</h2>
-						<p style="text-align: justify;"><span class="image left"><img src="images/PP internet fond doré.PNG" alt="" width="170"></span>Lorsque nous avons lancé ce projet, nous ne pensions pas qu'il continuerait si longtemps. La création de ce site est une étape importante car il rend notre présence sur internet beaucoup plus forte et concrète. Ce site sert de vitrine, il permet de présenter une vision très large de notre objectif. Vous y retrouverez une explication détaillée du fonctionnement de la cagnotte, mais aussi notre contact, ou, ci-dessous, toutes les actions que nous réalisons. Le défi technique, bien que présent, n'était qu'une étape accessible, que notre équipe a surmonté sans trop de difficultés grâce à l’aide de <a href="https://vercel.com/docs/getting-started-with-vercel" target="_blank" rel="noopener noreferrer">Vercel</a>, qui héberge notre site, et <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub</a>, qui en assure la gestion du code. Nous remercions très profondément ces différents sites qui proposent leurs services gratuitement, et sans qui le site internet n’aurait pas pu voir le jour. Ce site marque une nouvelle étape dans le développement de notre projet, et nous espérons qu’il continuera d’évoluer grâce à votre soutien.</p>
-						<p style="text-align: justify;"><span class="image right"><img src="images/Duolingo.jpg" alt="" /></span>Pour s'imprégner de la culture que nous avons choisie de transmettre, j'ai décidé de commencer l'apprentissage de la langue sacrée, l'hébreu. Pour cela, j'ai pu compter sur l'application d'apprentissage de langues la plus répandue : <a href="https://fr.duolingo.com/course/he/en/apprends-l%20h%C3%A9breu" target="_blank" rel="noopener noreferrer">Duolingo</a>. L'immanquable compteur de jours que tout le monde connait me sert de motivation et m'oblige à travailler quotidiennement. Aujourd'hui, ma série est de <span id="duolingo-count" class="duolingo-number"></span> jours. J'ai d'abord commencé par apprendre les sons que faisaient les différentes lettres. Ensuite, lorsque je savais lire phonétiquement n'importe quel mot, j'ai commencé les leçons qui m'ont permis d'apprendre du vocabulaire. La seule critique que je me dois de faire sur Duolingo, c'est qu'elle n'aide absolument pas au niveau des règles de grammaire. Ainsi, j'ai dû demander quelques conseils à <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPT</a>, qui a su répondre à l'entièreté de mes questions. Aujourd'hui, je sais réaliser quelques phrases simples, et je suis en capacité de comprendre des mots, écrits ou oraux.</p> 
-						<header class="major">
-							<h1>Cette section est encore en travail, du contenu supplémentaire sera bientôt disponible</h1>
-						</header>
-					</section>
-
-				</div>
-			</div>
-
-			<!-- Footer -->
-			<footer id="footer">
-				<ul class="copyright">
-					<li>&copy; 2025 Théo Juif. Tous droits réservés.</li>
-					<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+		<!-- Header -->
+		<header id="header">
+			<h1 id="logo"><a href="index.html">Théo Juif</a></h1>
+			<nav id="nav">
+				<ul>
+					<li><a href="projet.html">Notre projet</a></li>
+					<li><a href="cagnotte.html">La cagnotte</a></li>
+					<li><a href="contact.html" class="active">Contact</a></li>
 				</ul>
-			</footer>
+			</nav>
+		</header>
 
+		<!-- Main -->
+		<div id="main" class="wrapper style1">
+			<div class="container">
+
+				<header class="major">
+					<h2>Contact &amp; Partenaires</h2>
+					<p>Retrouvez-moi sur les réseaux sociaux, ou découvrez les projets qui nous accompagnent.</p>
+				</header>
+
+				<!-- ── Contact ───────────────────────────────────────────── -->
+				<section id="contact-section">
+					<h3 style="text-align:center; letter-spacing:0.15em; text-transform:uppercase; font-size:0.85em; color:rgba(255,255,255,0.35); margin-bottom:0.5em;">Me retrouver</h3>
+					<h2 style="text-align:center; margin-top:0;">Nos réseaux</h2>
+
+					<div class="contact-grid">
+
+						<!-- Instagram -->
+						<a href="https://www.instagram.com/theo_juif/"
+						   target="_blank" rel="noopener noreferrer"
+						   class="contact-card instagram">
+							<div class="icon-wrap">
+								<span class="icon brands fa-instagram"></span>
+							</div>
+							<p class="network-name">Instagram</p>
+							<p class="username">@theo_juif</p>
+							<span class="cta-label">Voir le profil →</span>
+						</a>
+
+						<!-- TikTok -->
+						<a href="https://www.tiktok.com/@theo_juif"
+						   target="_blank" rel="noopener noreferrer"
+						   class="contact-card tiktok">
+							<div class="icon-wrap">
+								<span class="icon brands fa-tiktok"></span>
+							</div>
+							<p class="network-name">TikTok</p>
+							<p class="username">@theo_juif</p>
+							<span class="cta-label">Voir le profil →</span>
+						</a>
+
+						<!-- YouTube -->
+						<a href="https://www.youtube.com/@Th%C3%A9oJuif"
+						   target="_blank" rel="noopener noreferrer"
+						   class="contact-card youtube">
+							<div class="icon-wrap">
+								<span class="icon brands fa-youtube"></span>
+							</div>
+							<p class="network-name">YouTube</p>
+							<p class="username">@ThéoJuif</p>
+							<span class="cta-label">Voir la chaîne →</span>
+						</a>
+
+						<!-- Email -->
+						<a href="mailto:th3o.juif@gmail.com"
+						   class="contact-card email">
+							<div class="icon-wrap">
+								<span class="icon solid fa-envelope"></span>
+							</div>
+							<p class="network-name">Email</p>
+							<p class="username">th3o.juif@gmail.com</p>
+							<span class="cta-label">Envoyer un mail →</span>
+						</a>
+
+					</div>
+				</section>
+
+				<!-- ── Partenaires ───────────────────────────────────────── -->
+				<section id="partenaires" class="partner-block">
+					<h3 style="text-align:center; letter-spacing:0.15em; text-transform:uppercase; font-size:0.85em; color:rgba(255,255,255,0.35); margin-bottom:0.5em;">Ils nous soutiennent</h3>
+					<h2 style="text-align:center; margin-top:0;">Nos partenaires</h2>
+					<p style="text-align:center; color:rgba(255,255,255,0.55); max-width:600px; margin:0 auto 0.5em;">
+						Des projets dans lesquels nous croyons, et qui croient en nous. Une entraide sincère entre créateurs.
+					</p>
+
+					<!-- FrigoSmart -->
+					<div class="partner-card">
+						<div class="partner-logo-wrap">🧊</div>
+						<div class="partner-info">
+							<h3>FrigoSmart — Ton Frigo Intelligent</h3>
+							<p>
+								Une application web pour ne plus jamais gaspiller. Scanne tes produits, reçois des recettes générées par IA depuis ce que tu as dans ton frigo, et suis tes habitudes alimentaires. Un projet pensé pour cuisiner mieux, avec ce qu'on a déjà.
+							</p>
+							<div class="partner-links">
+								<a href="https://frigo-intelligent.vercel.app/index.html"
+								   target="_blank" rel="noopener noreferrer"
+								   class="button primary small">Découvrir l'app</a>
+								<a href="https://instagram.com/revivefood_"
+								   target="_blank" rel="noopener noreferrer"
+								   class="insta-link">
+									<span class="icon brands fa-instagram"></span>
+									@revivefood_
+								</a>
+							</div>
+						</div>
+					</div>
+
+				</section>
+
+			</div>
 		</div>
 
-		<!-- Scripts -->
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/jquery.scrolly.min.js"></script>
-			<script src="assets/js/jquery.dropotron.min.js"></script>
-			<script src="assets/js/jquery.scrollex.min.js"></script>
-			<script src="assets/js/browser.min.js"></script>
-			<script src="assets/js/breakpoints.min.js"></script>
-			<script src="assets/js/util.js"></script>
-			<script src="assets/js/main.js"></script>
-			<script src="assets/js/duolingo.js"></script>
-	</body>
+		<!-- Footer -->
+		<footer id="footer">
+			<ul class="copyright">
+				<li>&copy; 2025 Théo Juif. Tous droits réservés.</li>
+				<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+			</ul>
+		</footer>
+
+	</div>
+
+	<!-- Scripts -->
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/jquery.dropotron.min.js"></script>
+	<script src="assets/js/jquery.scrollex.min.js"></script>
+	<script src="assets/js/browser.min.js"></script>
+	<script src="assets/js/breakpoints.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+
+</body>
 </html>
