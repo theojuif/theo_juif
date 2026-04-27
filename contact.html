@@ -5,185 +5,9 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<link rel="stylesheet" href="assets/css/main.css" />
+	<link rel="stylesheet" href="assets/css/contact.css" />
 	<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	<link rel="icon" href="images/favicon.ico" type="image/x-icon" />
-	<style>
-		/* ─── Contact Cards ─────────────────────────────────────────── */
-		.contact-grid {
-			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-			gap: 1.8em;
-			margin-top: 2.5em;
-		}
-
-		.contact-card {
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid rgba(255, 255, 255, 0.08);
-			border-radius: 12px;
-			padding: 2em 1.5em;
-			text-align: center;
-			transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
-			text-decoration: none;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			gap: 0.7em;
-			color: inherit;
-		}
-
-		.contact-card:hover {
-			transform: translateY(-5px);
-			background: rgba(255, 255, 255, 0.08);
-			border-color: rgba(255, 255, 255, 0.2);
-		}
-
-		/* Couleurs par réseau */
-		.contact-card.instagram:hover { border-color: #e1306c; box-shadow: 0 8px 30px rgba(225,48,108,0.18); }
-		.contact-card.tiktok:hover    { border-color: #69c9d0; box-shadow: 0 8px 30px rgba(105,201,208,0.18); }
-		.contact-card.youtube:hover   { border-color: #ff0000; box-shadow: 0 8px 30px rgba(255,0,0,0.18); }
-		.contact-card.email:hover     { border-color: #a8d8ea; box-shadow: 0 8px 30px rgba(168,216,234,0.18); }
-
-		.contact-card .icon-wrap {
-			font-size: 2.4em;
-			line-height: 1;
-		}
-		.contact-card .icon-wrap .fa-instagram { color: #e1306c; }
-		.contact-card .icon-wrap .fa-tiktok    { color: #69c9d0; }
-		.contact-card .icon-wrap .fa-youtube   { color: #ff0000; }
-		.contact-card .icon-wrap .fa-envelope  { color: #a8d8ea; }
-
-		.contact-card .network-name {
-			font-size: 1em;
-			font-weight: 700;
-			letter-spacing: 0.08em;
-			text-transform: uppercase;
-			color: #fff;
-			margin: 0;
-		}
-
-		.contact-card .username {
-			font-size: 0.95em;
-			color: rgba(255,255,255,0.55);
-			margin: 0;
-			word-break: break-all;
-		}
-
-		.contact-card .cta-label {
-			margin-top: 0.4em;
-			font-size: 0.78em;
-			letter-spacing: 0.12em;
-			text-transform: uppercase;
-			color: rgba(255,255,255,0.3);
-			transition: color 0.2s;
-		}
-		.contact-card:hover .cta-label {
-			color: rgba(255,255,255,0.7);
-		}
-
-		/* ─── Partner Section ───────────────────────────────────────── */
-		.partner-block {
-			margin-top: 5em;
-			padding-top: 3.5em;
-			border-top: 1px solid rgba(255, 255, 255, 0.08);
-		}
-
-		.partner-card {
-			display: flex;
-			align-items: center;
-			gap: 3em;
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid rgba(255, 255, 255, 0.08);
-			border-radius: 14px;
-			padding: 2.5em 3em;
-			margin-top: 2.5em;
-			transition: background 0.25s ease, border-color 0.25s ease;
-		}
-
-		.partner-card:hover {
-			background: rgba(255, 255, 255, 0.07);
-			border-color: rgba(105, 201, 208, 0.3);
-		}
-
-		.partner-logo-wrap {
-			flex-shrink: 0;
-			width: 90px;
-			height: 90px;
-			background: linear-gradient(135deg, #1a2a2a, #0d1f1f);
-			border-radius: 50%;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			font-size: 2.6em;
-			border: 2px solid rgba(105, 201, 208, 0.3);
-		}
-
-		.partner-info {
-			flex: 1;
-		}
-
-		.partner-info h3 {
-			margin: 0 0 0.4em 0;
-			font-size: 1.35em;
-			color: #fff;
-		}
-
-		.partner-info p {
-			margin: 0 0 1.2em 0;
-			color: rgba(255, 255, 255, 0.6);
-			font-size: 0.95em;
-			line-height: 1.6;
-		}
-
-		.partner-links {
-			display: flex;
-			gap: 1em;
-			flex-wrap: wrap;
-			align-items: center;
-		}
-
-		.partner-links .button {
-			margin: 0;
-		}
-
-		.partner-links .insta-link {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.4em;
-			color: rgba(255,255,255,0.5);
-			font-size: 0.85em;
-			letter-spacing: 0.06em;
-			text-decoration: none;
-			transition: color 0.2s;
-		}
-		.partner-links .insta-link:hover {
-			color: #e1306c;
-		}
-		.partner-links .insta-link .fa-instagram {
-			font-size: 1.1em;
-		}
-
-		/* ─── Responsive ────────────────────────────────────────────── */
-		@media (max-width: 768px) {
-			.partner-card {
-				flex-direction: column;
-				text-align: center;
-				padding: 2em 1.5em;
-				gap: 1.5em;
-			}
-			.partner-links {
-				justify-content: center;
-			}
-			.contact-grid {
-				grid-template-columns: 1fr 1fr;
-			}
-		}
-
-		@media (max-width: 480px) {
-			.contact-grid {
-				grid-template-columns: 1fr;
-			}
-		}
-	</style>
 </head>
 <body class="is-preload">
 	<div id="page-wrapper">
@@ -209,14 +33,14 @@
 					<p>Retrouvez-moi sur les réseaux sociaux, ou découvrez les projets qui nous accompagnent.</p>
 				</header>
 
-				<!-- ── Contact ───────────────────────────────────────────── -->
+				<!-- ── Réseaux sociaux ─────────────────────────────────── -->
 				<section id="contact-section">
-					<h3 style="text-align:center; letter-spacing:0.15em; text-transform:uppercase; font-size:0.85em; color:rgba(255,255,255,0.35); margin-bottom:0.5em;">Me retrouver</h3>
-					<h2 style="text-align:center; margin-top:0;">Nos réseaux</h2>
+
+					<h3 class="contact-section-label">Me retrouver</h3>
+					<h2 class="contact-section-title">Nos réseaux</h2>
 
 					<div class="contact-grid">
 
-						<!-- Instagram -->
 						<a href="https://www.instagram.com/theo_juif/"
 						   target="_blank" rel="noopener noreferrer"
 						   class="contact-card instagram">
@@ -228,7 +52,6 @@
 							<span class="cta-label">Voir le profil →</span>
 						</a>
 
-						<!-- TikTok -->
 						<a href="https://www.tiktok.com/@theo_juif"
 						   target="_blank" rel="noopener noreferrer"
 						   class="contact-card tiktok">
@@ -240,7 +63,6 @@
 							<span class="cta-label">Voir le profil →</span>
 						</a>
 
-						<!-- YouTube -->
 						<a href="https://www.youtube.com/@Th%C3%A9oJuif"
 						   target="_blank" rel="noopener noreferrer"
 						   class="contact-card youtube">
@@ -252,7 +74,6 @@
 							<span class="cta-label">Voir la chaîne →</span>
 						</a>
 
-						<!-- Email -->
 						<a href="mailto:th3o.juif@gmail.com"
 						   class="contact-card email">
 							<div class="icon-wrap">
@@ -266,15 +87,15 @@
 					</div>
 				</section>
 
-				<!-- ── Partenaires ───────────────────────────────────────── -->
+				<!-- ── Partenaires ─────────────────────────────────────── -->
 				<section id="partenaires" class="partner-block">
-					<h3 style="text-align:center; letter-spacing:0.15em; text-transform:uppercase; font-size:0.85em; color:rgba(255,255,255,0.35); margin-bottom:0.5em;">Ils nous soutiennent</h3>
-					<h2 style="text-align:center; margin-top:0;">Nos partenaires</h2>
-					<p style="text-align:center; color:rgba(255,255,255,0.55); max-width:600px; margin:0 auto 0.5em;">
+
+					<h3 class="section-label">Ils nous soutiennent</h3>
+					<h2 class="section-title">Nos partenaires</h2>
+					<p class="section-intro">
 						Des projets dans lesquels nous croyons, et qui croient en nous. Une entraide sincère entre créateurs.
 					</p>
 
-					<!-- FrigoSmart -->
 					<div class="partner-card">
 						<div class="partner-logo-wrap">🧊</div>
 						<div class="partner-info">
