@@ -1,26 +1,31 @@
 /**
  * torah-du-jour.js
  *
- * Deux sources :
- *  - Hébreu  : API Sefaria (texte massorétique, fiable)
- *  - Français : API bible.helloao.org – Louis Segond 1910 (LSG)
- *               domaine public, Torah complète, "l'Éternel" pour le nom divin
+ * Sources :
+ *  - Français : bolls.life API — Louis Segond 1910 (LSG)
+ *               Endpoint simple, fiable, sans clé, sans limite
+ *               Numéros de livres : Genèse=1, Exode=2, Lévitique=3, Nombres=4, Deutéronome=5
  *
- * Seed déterministe : même date = même verset. Jours futurs bloqués.
+ *  - Hébreu : Sefaria API v2 — texte massorétique
+ *
+ * Seed déterministe : même date → même verset. Jours futurs bloqués.
  */
 
 (function () {
   "use strict";
 
-  // ─── Torah books ──────────────────────────────────────────────────────────
+  // ─── Configuration ────────────────────────────────────────────────────────
 
-  // Livres avec leur nombre de chapitres ET leur identifiant LSG (helloao.org)
+  // bollsBook : numéro de livre dans bolls.life (Ancien Testament commence à 1)
+  // sefariaRef : nom du livre pour Sefaria
+  // chapters : nombre de chapitres
+  // versesPerChapter : estimation conservative (on sera toujours en dessous du max réel)
   const TORAH_BOOKS = [
-    { ref: "Genesis",     lsg: "GEN", chapters: 50 },
-    { ref: "Exodus",      lsg: "EXO", chapters: 40 },
-    { ref: "Leviticus",   lsg: "LEV", chapters: 27 },
-    { ref: "Numbers",     lsg: "NUM", chapters: 36 },
-    { ref: "Deuteronomy", lsg: "DEU", chapters: 34 },
+    { name: "Genesis",     bollsBook: 1,  sefariaRef: "Genesis",     chapters: 50, maxVerse: 25 },
+    { name: "Exodus",      bollsBook: 2,  sefariaRef: "Exodus",      chapters: 40, maxVerse: 25 },
+    { name: "Leviticus",   bollsBook: 3,  sefariaRef: "Leviticus",   chapters: 27, maxVerse: 20 },
+    { name: "Numbers",     bollsBook: 4,  sefariaRef: "Numbers",     chapters: 36, maxVerse: 25 },
+    { name: "Deuteronomy", bollsBook: 5,  sefariaRef: "Deuteronomy", chapters: 34, maxVerse: 25 },
   ];
 
   const BOOK_NAMES_FR = {
@@ -67,7 +72,7 @@
     });
   }
 
-  // ─── Nettoyage texte Sefaria ──────────────────────────────────────────────
+  // ─── Nettoyage hébreu Sefaria ─────────────────────────────────────────────
 
   function cleanHebrew(raw) {
     if (!raw) return "";
@@ -78,20 +83,13 @@
       .replace(/&nbsp;/g, " ").replace(/&thinsp;/g, "\u2009")
       .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1),16)))
       .replace(/&#\d+;/g, m => String.fromCodePoint(parseInt(m.slice(2,-1),10)));
-    // Retire cantillations (U+0591–U+05AF) + ponctuation massorétique parasites
+    // Retire cantillations (U+0591–U+05AF) et ponctuation massorétique parasites
     raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
     return raw.replace(/\s{2,}/g, " ").trim();
   }
 
-  // ─── Sélection aléatoire ──────────────────────────────────────────────────
+  // ─── Sélection du verset ──────────────────────────────────────────────────
 
-  /**
-   * Retourne { book, chapter, verseIndex }
-   * verseIndex est un indice 0-based dans le tableau des versets du chapitre.
-   * On ne connaît pas le nombre exact de versets avant d'appeler l'API LSG,
-   * donc on tire un nombre entre 0 et 29 (les chapitres ont rarement + de 30v).
-   * Si l'indice dépasse la longueur réelle, on prend le dernier verset.
-   */
   function pickVerse(seed) {
     const rand = seededRng(seed);
     const totalChapters = TORAH_BOOKS.reduce((a, b) => a + b.chapters, 0);
@@ -101,76 +99,73 @@
       r -= b.chapters;
       if (r <= 0) { book = b; break; }
     }
-    const chapter    = 1 + Math.floor(rand() * book.chapters);
-    const verseIndex = Math.floor(rand() * 30); // 0-based, clampé après appel API
-    return { book, chapter, verseIndex };
+    const chapter = 1 + Math.floor(rand() * book.chapters);
+    const verse   = 1 + Math.floor(rand() * book.maxVerse);
+    return { book, chapter, verse };
   }
 
-  // ─── API 1 : Hébreu via Sefaria ───────────────────────────────────────────
-
-  async function fetchHebrew(bookRef, chapter, verseNumber) {
-    const ref = `${bookRef}.${chapter}.${verseNumber}`;
-    const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?context=0&commentary=0`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Sefaria HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return cleanHebrew(data.he);
-  }
-
-  // ─── API 2 : Français via bible.helloao.org (LSG 1910) ───────────────────
+  // ─── API bolls.life — Traduction française LSG ────────────────────────────
 
   /**
-   * Récupère tout le chapitre d'un coup (plus efficace que verset par verset).
-   * Retourne un tableau de { number, text }.
+   * GET https://bolls.life/get-verse/LSG/{book}/{chapter}/{verse}/
+   * Retourne : { pk, verse, text, comment }
+   * Si le verset n'existe pas → retente avec verse=1
    */
-  async function fetchChapterLSG(lsgId, chapter) {
-    const url = `https://bible.helloao.org/api/LSG/${lsgId}/${chapter}.json`;
+  async function fetchFrench(bollsBook, chapter, verse, isRetry) {
+    const url = `https://bolls.life/get-verse/LSG/${bollsBook}/${chapter}/${verse}/`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`LSG HTTP ${res.status}`);
+    if (!res.ok) {
+      if (!isRetry) return fetchFrench(bollsBook, chapter, 1, true);
+      throw new Error(`bolls.life HTTP ${res.status}`);
+    }
     const data = await res.json();
 
-    // La réponse helloao v2 : data.verses = [{ number, content: [{type,text}] }]
-    const verses = [];
-    for (const v of (data.verses || [])) {
-      // Concaténer tous les fragments de texte du verset
-      let text = "";
-      for (const block of (v.content || [])) {
-        if (block.type === "verse_start" || block.type === "verse_end") continue;
-        if (typeof block.text === "string") text += block.text;
-        if (typeof block     === "string") text += block;
-      }
-      text = text.trim();
-      if (text) verses.push({ number: v.number, text });
+    // bolls.life renvoie du HTML dans le champ text — on le nettoie
+    let text = data.text || "";
+    text = text.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+
+    if (!text) {
+      if (!isRetry) return fetchFrench(bollsBook, chapter, 1, true);
+      throw new Error("Verset vide (LSG).");
     }
-    return verses;
+
+    return { verseNumber: data.verse || verse, text };
   }
 
-  // ─── Orchestration principale ─────────────────────────────────────────────
+  // ─── API Sefaria — Texte hébreu ───────────────────────────────────────────
 
-  async function fetchVerse(book, chapter, verseIndex) {
-    // 1. Récupérer le chapitre en français (LSG)
-    const verses = await fetchChapterLSG(book.lsg, chapter);
-    if (!verses.length) throw new Error("Chapitre introuvable (LSG).");
-
-    // 2. Clamp l'index si besoin
-    const idx    = Math.min(verseIndex, verses.length - 1);
-    const picked = verses[idx];
-
-    // 3. Récupérer le texte hébreu du même verset via Sefaria
-    let heText = "";
+  /**
+   * Ne lève jamais d'exception — retourne "" si indisponible.
+   */
+  async function fetchHebrew(sefariaRef, chapter, verse) {
     try {
-      heText = await fetchHebrew(book.ref, chapter, picked.number);
-    } catch (e) {
-      console.warn("[torah-du-jour] Hébreu indisponible :", e.message);
+      const ref = `${sefariaRef}.${chapter}.${verse}`;
+      const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?context=0&commentary=0`;
+      const res = await fetch(url);
+      if (!res.ok) return "";
+      const data = await res.json();
+      if (data.error) return "";
+      return cleanHebrew(data.he) || "";
+    } catch (_) {
+      return "";
     }
+  }
+
+  // ─── Orchestration ────────────────────────────────────────────────────────
+
+  async function fetchVerse(book, chapter, verse) {
+    // 1. Français d'abord (source principale, ne doit pas échouer)
+    const fr = await fetchFrench(book.bollsBook, chapter, verse, false);
+
+    // 2. Hébreu en parallèle (optionnel)
+    const heText = await fetchHebrew(book.sefariaRef, chapter, fr.verseNumber);
 
     return {
-      book:        book.ref,
+      book:    book.name,
       chapter,
-      verse:       picked.number,
-      he:          heText,
-      translation: picked.text,
+      verse:   fr.verseNumber,
+      he:      heText,
+      fr:      fr.text,
     };
   }
 
@@ -195,13 +190,12 @@
     el("tdj-content").classList.remove("tdj-loading");
   }
 
-  function renderVerse(verseData, date) {
-    const bookFr = BOOK_NAMES_FR[verseData.book] || verseData.book;
+  function renderVerse(v, date) {
     el("tdj-date").textContent        = formatDateFr(date);
     el("tdj-ref").textContent         =
-      `${bookFr} — chapitre ${verseData.chapter}, verset ${verseData.verse}`;
-    el("tdj-he").textContent          = verseData.he || "";
-    el("tdj-translation").textContent = verseData.translation;
+      `${BOOK_NAMES_FR[v.book] || v.book} — chapitre ${v.chapter}, verset ${v.verse}`;
+    el("tdj-he").textContent          = v.he;
+    el("tdj-translation").textContent = v.fr;
     el("tdj-label").textContent       = "Traduction française · Louis Segond 1910";
     el("tdj-label").style.display     = "block";
     el("tdj-error").style.display     = "none";
@@ -223,9 +217,9 @@
   async function loadVerse(date) {
     setLoading(date);
     updateNavButtons(date);
-    const { book, chapter, verseIndex } = pickVerse(dateToSeed(date));
+    const { book, chapter, verse } = pickVerse(dateToSeed(date));
     try {
-      const verseData = await fetchVerse(book, chapter, verseIndex);
+      const verseData = await fetchVerse(book, chapter, verse);
       renderVerse(verseData, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
@@ -246,14 +240,12 @@
   document.addEventListener("DOMContentLoaded", function () {
     today       = localMidnight(new Date());
     currentDate = localMidnight(new Date());
-
     el("tdj-prev").addEventListener("click",  () => navigate(-1));
     el("tdj-next").addEventListener("click",  () => navigate(+1));
     el("tdj-today").addEventListener("click", () => {
       currentDate = localMidnight(new Date());
       loadVerse(currentDate);
     });
-
     loadVerse(currentDate);
   });
 
