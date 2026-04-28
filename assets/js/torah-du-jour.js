@@ -1,28 +1,14 @@
-/**
- * torah-du-jour.js
- *
- * Sources :
- *  - Français : api.getbible.net/v2/lsg/{book}/{chapter}.json
- *    Retourne un objet { verses: { "1": {verse,text}, "2": {...}, ... } }
- *    On charge tout le chapitre → on sait exactement combien de versets il y a.
- *    Numéros de livres getbible : Genèse=1, Exode=2, Lévitique=3, Nombres=4, Deutéronome=5
- *
- *  - Hébreu : Sefaria API v2 (optionnel, ne bloque jamais)
- *
- * Seed déterministe : même date → même verset. Jours futurs bloqués.
- */
-
 (function () {
   "use strict";
 
-  // ─── Configuration ────────────────────────────────────────────────────────
+  // ─── CONFIG ─────────────────────────────────────────
 
   const TORAH_BOOKS = [
-    { name: "Genesis",     getBibleBook: 1, sefariaRef: "Genesis",     chapters: 50 },
-    { name: "Exodus",      getBibleBook: 2, sefariaRef: "Exodus",      chapters: 40 },
-    { name: "Leviticus",   getBibleBook: 3, sefariaRef: "Leviticus",   chapters: 27 },
-    { name: "Numbers",     getBibleBook: 4, sefariaRef: "Numbers",     chapters: 36 },
-    { name: "Deuteronomy", getBibleBook: 5, sefariaRef: "Deuteronomy", chapters: 34 },
+    { name: "Genesis",     id: "1", chapters: 50 },
+    { name: "Exodus",      id: "2", chapters: 40 },
+    { name: "Leviticus",   id: "3", chapters: 27 },
+    { name: "Numbers",     id: "4", chapters: 36 },
+    { name: "Deuteronomy", id: "5", chapters: 34 },
   ];
 
   const BOOK_NAMES_FR = {
@@ -33,7 +19,21 @@
     Deuteronomy: "Devarim · Deutéronome",
   };
 
-  // ─── PRNG déterministe (mulberry32) ──────────────────────────────────────
+  // ─── DATA CACHE ─────────────────────────────────────
+
+  let BIBLE_DATA = null;
+
+  async function loadBible() {
+    if (BIBLE_DATA) return BIBLE_DATA;
+
+    const url = "https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/fr_lsg.json";
+    const res = await fetch(url);
+    BIBLE_DATA = await res.json();
+
+    return BIBLE_DATA;
+  }
+
+  // ─── RNG ────────────────────────────────────────────
 
   function seededRng(seed) {
     let s = seed >>> 0;
@@ -46,195 +46,171 @@
   }
 
   function dateToSeed(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return parseInt(`${y}${m}${d}`, 10);
+    return parseInt(
+      `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}`,
+      10
+    );
   }
 
-  // ─── Utilitaires date ─────────────────────────────────────────────────────
+  // ─── UTILS DATE ─────────────────────────────────────
 
   function localMidnight(date) {
     const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
+    d.setHours(0,0,0,0);
     return d;
   }
 
   function formatDateFr(date) {
     return date.toLocaleDateString("fr-FR", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      weekday:"long", year:"numeric", month:"long", day:"numeric"
     });
   }
 
-  // ─── Nettoyage hébreu Sefaria ─────────────────────────────────────────────
+  // ─── HEBREU ─────────────────────────────────────────
 
   function cleanHebrew(raw) {
     if (!raw) return "";
-    if (Array.isArray(raw)) raw = raw.flat(Infinity).join(" ");
-    raw = raw.replace(/<[^>]+>/g, " ");
-    raw = raw
-      .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
-      .replace(/&nbsp;/g," ").replace(/&thinsp;/g,"\u2009")
-      .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1),16)))
-      .replace(/&#\d+;/g, m => String.fromCodePoint(parseInt(m.slice(2,-1),10)));
-    raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
-    return raw.replace(/\s{2,}/g," ").trim();
+    if (Array.isArray(raw)) raw = raw.join(" ");
+    return raw.replace(/<[^>]+>/g,"").trim();
   }
 
-  // ─── Sélection ────────────────────────────────────────────────────────────
+  async function fetchHebrew(book, chapter, verse) {
+    try {
+      const url = `https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return cleanHebrew(data.he);
+    } catch {
+      return "";
+    }
+  }
 
-  // verseRatio ∈ [0,1) — sera multiplié par la taille réelle du chapitre
+  // ─── SELECTION ──────────────────────────────────────
+
   function pickTarget(seed) {
     const rand = seededRng(seed);
-    const totalChapters = TORAH_BOOKS.reduce((a,b) => a + b.chapters, 0);
-    let r = rand() * totalChapters;
-    let book = TORAH_BOOKS[TORAH_BOOKS.length - 1];
-    for (const b of TORAH_BOOKS) { r -= b.chapters; if (r <= 0) { book = b; break; } }
-    const chapter    = 1 + Math.floor(rand() * book.chapters);
+
+    const total = TORAH_BOOKS.reduce((a,b)=>a+b.chapters,0);
+    let r = rand() * total;
+
+    let book = TORAH_BOOKS[0];
+    for (const b of TORAH_BOOKS) {
+      r -= b.chapters;
+      if (r <= 0) { book = b; break; }
+    }
+
+    const chapter = 1 + Math.floor(rand()*book.chapters);
     const verseRatio = rand();
+
     return { book, chapter, verseRatio };
   }
 
-  // ─── API getbible.net — chapitre LSG complet ──────────────────────────────
+  // ─── LSG (LOCAL JSON) ───────────────────────────────
 
-  /**
-   * GET https://api.getbible.net/v2/lsg/{book}/{chapter}.json
-   *
-   * Réponse attendue :
-   * {
-   *   "book_nr": 1, "chapter": 1,
-   *   "verses": {
-   *     "1": { "verse": 1, "text": "Au commencement..." },
-   *     "2": { "verse": 2, "text": "La terre était..." },
-   *     ...
-   *   }
-   * }
-   *
-   * On convertit verses en tableau trié par numéro de verset.
-   */
-  async function fetchChapterLSG(getBibleBook, chapter) {
-    const url = `https://api.getbible.net/v2/lsg/${getBibleBook}/${chapter}.json`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`getbible HTTP ${res.status} — livre ${getBibleBook} ch.${chapter}`);
+  async function fetchChapterLSG(bookId, chapter) {
+    const data = await loadBible();
 
-    const data = await res.json();
+    const book = data[bookId];
+    if (!book) throw new Error("Livre introuvable");
 
-    // Extraire et trier les versets
-    const versesRaw = data.verses;
-    if (!versesRaw || typeof versesRaw !== "object") {
-      throw new Error(`Format inattendu (livre ${getBibleBook} ch.${chapter})`);
-    }
+    const chap = book[chapter];
+    if (!chap) throw new Error("Chapitre introuvable");
 
-    const verses = Object.values(versesRaw)
-      .filter(v => v && v.text)
-      .sort((a, b) => (a.verse || 0) - (b.verse || 0));
-
-    if (verses.length === 0) {
-      throw new Error(`Chapitre vide (livre ${getBibleBook} ch.${chapter})`);
-    }
-
-    return verses; // [{ verse: 1, text: "..." }, ...]
+    return Object.entries(chap).map(([v, text]) => ({
+      verse: parseInt(v,10),
+      text
+    }));
   }
 
-  // ─── Sefaria — hébreu optionnel ───────────────────────────────────────────
+  async function fetchVerse(book, chapter, ratio) {
+    const verses = await fetchChapterLSG(book.id, chapter);
 
-  async function fetchHebrew(sefariaRef, chapter, verse) {
-    try {
-      const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(sefariaRef+"."+chapter+"."+verse)}?context=0&commentary=0`;
-      const res = await fetch(url);
-      if (!res.ok) return "";
-      const data = await res.json();
-      if (data.error) return "";
-      return cleanHebrew(data.he) || "";
-    } catch (_) { return ""; }
+    const idx = Math.min(Math.floor(ratio * verses.length), verses.length - 1);
+    const v = verses[idx];
+
+    const he = await fetchHebrew(book.name, chapter, v.verse);
+
+    return {
+      book: book.name,
+      chapter,
+      verse: v.verse,
+      fr: v.text,
+      he
+    };
   }
 
-  // ─── Orchestration ────────────────────────────────────────────────────────
+  // ─── DOM ───────────────────────────────────────────
 
-  async function fetchVerse(book, chapter, verseRatio) {
-    const verses = await fetchChapterLSG(book.getBibleBook, chapter);
-    const idx    = Math.min(Math.floor(verseRatio * verses.length), verses.length - 1);
-    const picked = verses[idx];
-
-    const heText = await fetchHebrew(book.sefariaRef, chapter, picked.verse);
-
-    return { book: book.name, chapter, verse: picked.verse, fr: picked.text, he: heText };
-  }
-
-  // ─── DOM ──────────────────────────────────────────────────────────────────
-
-  function el(id) { return document.getElementById(id); }
+  const el = id => document.getElementById(id);
 
   function setLoading(date) {
-    el("tdj-date").textContent        = formatDateFr(date);
-    el("tdj-ref").textContent         = "Chargement…";
-    el("tdj-he").textContent          = "";
+    el("tdj-date").textContent = formatDateFr(date);
+    el("tdj-ref").textContent = "Chargement…";
+    el("tdj-he").textContent = "";
     el("tdj-translation").textContent = "";
-    el("tdj-label").style.display     = "none";
-    el("tdj-error").style.display     = "none";
-    el("tdj-content").classList.add("tdj-loading");
   }
 
   function setError(msg) {
-    el("tdj-error").textContent   = msg;
-    el("tdj-error").style.display = "block";
-    el("tdj-ref").textContent     = "";
-    el("tdj-content").classList.remove("tdj-loading");
+    el("tdj-ref").textContent = msg;
   }
 
-  function renderVerse(v, date) {
-    el("tdj-date").textContent        = formatDateFr(date);
-    el("tdj-ref").textContent         =
-      `${BOOK_NAMES_FR[v.book] || v.book} — chapitre ${v.chapter}, verset ${v.verse}`;
-    el("tdj-he").textContent          = v.he;
+  function render(v, date) {
+    el("tdj-date").textContent = formatDateFr(date);
+    el("tdj-ref").textContent =
+      `${BOOK_NAMES_FR[v.book]} — chapitre ${v.chapter}, verset ${v.verse}`;
+    el("tdj-he").textContent = v.he;
     el("tdj-translation").textContent = v.fr;
-    el("tdj-label").textContent       = "Traduction française · Louis Segond 1910";
-    el("tdj-label").style.display     = "block";
-    el("tdj-error").style.display     = "none";
-    el("tdj-content").classList.remove("tdj-loading");
   }
 
-  // ─── Navigation ───────────────────────────────────────────────────────────
+  // ─── NAV ───────────────────────────────────────────
 
   let currentDate, today;
 
-  function updateNavButtons(date) {
+  function updateNav(date) {
     const next = new Date(date);
-    next.setDate(next.getDate() + 1);
-    el("tdj-prev").disabled  = false;
-    el("tdj-next").disabled  = localMidnight(next) > today;
+    next.setDate(next.getDate()+1);
+
+    el("tdj-next").disabled = localMidnight(next) > today;
     el("tdj-today").disabled = date.getTime() === today.getTime();
   }
 
-  async function loadVerse(date) {
+  async function load(date) {
     setLoading(date);
-    updateNavButtons(date);
+    updateNav(date);
+
     const { book, chapter, verseRatio } = pickTarget(dateToSeed(date));
+
     try {
-      renderVerse(await fetchVerse(book, chapter, verseRatio), date);
+      const v = await fetchVerse(book, chapter, verseRatio);
+      render(v, date);
     } catch (e) {
-      setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
-      console.error("[torah-du-jour]", e);
+      console.error(e);
+      setError("Erreur de chargement");
     }
   }
 
   function navigate(delta) {
-    const next = localMidnight(new Date(currentDate));
-    next.setDate(next.getDate() + delta);
-    if (next > today) return;
-    currentDate = next;
-    loadVerse(currentDate);
+    const d = new Date(currentDate);
+    d.setDate(d.getDate()+delta);
+    if (d > today) return;
+    currentDate = localMidnight(d);
+    load(currentDate);
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── INIT ──────────────────────────────────────────
 
-  document.addEventListener("DOMContentLoaded", function () {
-    today       = localMidnight(new Date());
-    currentDate = localMidnight(new Date());
-    el("tdj-prev").addEventListener("click",  () => navigate(-1));
-    el("tdj-next").addEventListener("click",  () => navigate(+1));
-    el("tdj-today").addEventListener("click", () => { currentDate = localMidnight(new Date()); loadVerse(currentDate); });
-    loadVerse(currentDate);
+  document.addEventListener("DOMContentLoaded", () => {
+    today = localMidnight(new Date());
+    currentDate = today;
+
+    el("tdj-prev").onclick = () => navigate(-1);
+    el("tdj-next").onclick = () => navigate(1);
+    el("tdj-today").onclick = () => {
+      currentDate = today;
+      load(today);
+    };
+
+    load(today);
   });
 
 })();
