@@ -4,20 +4,30 @@
   // ─── CONFIG ─────────────────────────────────────────
 
   const TORAH_BOOKS = [
-    { name: "Genesis",     id: "1", chapters: 50 },
-    { name: "Exodus",      id: "2", chapters: 40 },
-    { name: "Leviticus",   id: "3", chapters: 27 },
-    { name: "Numbers",     id: "4", chapters: 36 },
+    { name: "Genesis", id: "1", chapters: 50 },
+    { name: "Exodus", id: "2", chapters: 40 },
+    { name: "Leviticus", id: "3", chapters: 27 },
+    { name: "Numbers", id: "4", chapters: 36 },
     { name: "Deuteronomy", id: "5", chapters: 34 },
   ];
 
   const BOOK_NAMES_FR = {
-    Genesis:     "Bereshit · Genèse",
-    Exodus:      "Shemot · Exode",
-    Leviticus:   "Vayikra · Lévitique",
-    Numbers:     "Bamidbar · Nombres",
+    Genesis: "Bereshit · Genèse",
+    Exodus: "Shemot · Exode",
+    Leviticus: "Vayikra · Lévitique",
+    Numbers: "Bamidbar · Nombres",
     Deuteronomy: "Devarim · Deutéronome",
   };
+
+  let TORAH = null;
+
+  async function loadTorah() {
+    if (TORAH) return TORAH;
+
+    const res = await fetch("/torah.json");
+    TORAH = await res.json();
+    return TORAH;
+  }
 
   // ─── RNG ───────────────────────────────────────────
 
@@ -38,8 +48,6 @@
     );
   }
 
-  // ─── DATE ──────────────────────────────────────────
-
   function localMidnight(date) {
     const d = new Date(date);
     d.setHours(0,0,0,0);
@@ -52,59 +60,35 @@
     });
   }
 
-  // ─── HEBREU (optionnel) ────────────────────────────
-
-  function cleanHebrew(raw) {
-    if (!raw) return "";
-    if (Array.isArray(raw)) raw = raw.join(" ");
-    return raw.replace(/<[^>]+>/g,"").trim();
-  }
+  // ─── HEBREU ─────────────────────────────────────────
 
   async function fetchHebrew(book, chapter, verse) {
     try {
       const url = `https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`;
       const res = await fetch(url);
       const data = await res.json();
-      return cleanHebrew(data.he);
+      return (data.he || "").replace(/<[^>]+>/g,"");
     } catch {
       return "";
     }
   }
 
-  // ─── API LSG (FIABLE) ──────────────────────────────
+  // ─── FETCH LOCAL ───────────────────────────────────
 
-  async function fetchChapterLSG(bookId, chapter) {
+  async function fetchChapter(bookId, chapter) {
+    const data = await loadTorah();
 
-    const BOOK_API_NAMES = {
-      "1": "genesis",
-      "2": "exodus",
-      "3": "leviticus",
-      "4": "numbers",
-      "5": "deuteronomy"
-    };
+    const book = data[bookId];
+    if (!book) throw new Error("Livre introuvable");
 
-    const bookName = BOOK_API_NAMES[bookId];
-    const url = `https://bible-api.com/${bookName}+${chapter}?translation=lsg`;
+    const chap = book[chapter];
+    if (!chap) throw new Error("Chapitre introuvable");
 
-    const res = await fetch(url);
-
-    if (!res.ok) {
-      throw new Error(`Erreur API ${res.status}`);
-    }
-
-    const data = await res.json();
-
-    if (!data.verses || data.verses.length === 0) {
-      throw new Error("Aucun verset trouvé");
-    }
-
-    return data.verses.map(v => ({
-      verse: v.verse,
-      text: v.text
+    return Object.entries(chap).map(([v, text]) => ({
+      verse: parseInt(v,10),
+      text
     }));
   }
-
-  // ─── SELECTION ─────────────────────────────────────
 
   function pickTarget(seed) {
     const rand = seededRng(seed);
@@ -125,7 +109,7 @@
   }
 
   async function fetchVerse(book, chapter, ratio) {
-    const verses = await fetchChapterLSG(book.id, chapter);
+    const verses = await fetchChapter(book.id, chapter);
 
     const idx = Math.min(Math.floor(ratio * verses.length), verses.length - 1);
     const v = verses[idx];
@@ -145,17 +129,6 @@
 
   const el = id => document.getElementById(id);
 
-  function setLoading(date) {
-    el("tdj-date").textContent = formatDateFr(date);
-    el("tdj-ref").textContent = "Chargement…";
-    el("tdj-he").textContent = "";
-    el("tdj-translation").textContent = "";
-  }
-
-  function setError(msg) {
-    el("tdj-ref").textContent = msg;
-  }
-
   function render(v, date) {
     el("tdj-date").textContent = formatDateFr(date);
     el("tdj-ref").textContent =
@@ -164,54 +137,20 @@
     el("tdj-translation").textContent = v.fr;
   }
 
-  // ─── NAVIGATION ────────────────────────────────────
-
   let currentDate, today;
 
-  function updateNav(date) {
-    const next = new Date(date);
-    next.setDate(next.getDate()+1);
-
-    el("tdj-next").disabled = localMidnight(next) > today;
-    el("tdj-today").disabled = date.getTime() === today.getTime();
-  }
-
   async function load(date) {
-    setLoading(date);
-    updateNav(date);
-
     const { book, chapter, verseRatio } = pickTarget(dateToSeed(date));
-
     try {
-      const v = await fetchVerse(book, chapter, verseRatio);
-      render(v, date);
+      render(await fetchVerse(book, chapter, verseRatio), date);
     } catch (e) {
       console.error(e);
-      setError("Impossible de charger le verset.");
     }
   }
-
-  function navigate(delta) {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate()+delta);
-    if (d > today) return;
-    currentDate = localMidnight(d);
-    load(currentDate);
-  }
-
-  // ─── INIT ──────────────────────────────────────────
 
   document.addEventListener("DOMContentLoaded", () => {
     today = localMidnight(new Date());
     currentDate = today;
-
-    el("tdj-prev").onclick = () => navigate(-1);
-    el("tdj-next").onclick = () => navigate(1);
-    el("tdj-today").onclick = () => {
-      currentDate = today;
-      load(today);
-    };
-
     load(today);
   });
 
