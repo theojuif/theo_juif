@@ -3,10 +3,10 @@
  *
  * Sources :
  *  - Français : bolls.life API — Louis Segond 1910 (LSG)
- *               Endpoint simple, fiable, sans clé, sans limite
- *               Numéros de livres : Genèse=1, Exode=2, Lévitique=3, Nombres=4, Deutéronome=5
+ *    On charge tout le chapitre puis on y pioche le bon verset par index.
+ *    Aucun risque de 404 "verset hors limites".
  *
- *  - Hébreu : Sefaria API v2 — texte massorétique
+ *  - Hébreu : Sefaria API v2 — texte massorétique (optionnel, ne bloque pas)
  *
  * Seed déterministe : même date → même verset. Jours futurs bloqués.
  */
@@ -16,16 +16,12 @@
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
-  // bollsBook : numéro de livre dans bolls.life (Ancien Testament commence à 1)
-  // sefariaRef : nom du livre pour Sefaria
-  // chapters : nombre de chapitres
-  // versesPerChapter : estimation conservative (on sera toujours en dessous du max réel)
   const TORAH_BOOKS = [
-    { name: "Genesis",     bollsBook: 1,  sefariaRef: "Genesis",     chapters: 50, maxVerse: 25 },
-    { name: "Exodus",      bollsBook: 2,  sefariaRef: "Exodus",      chapters: 40, maxVerse: 25 },
-    { name: "Leviticus",   bollsBook: 3,  sefariaRef: "Leviticus",   chapters: 27, maxVerse: 20 },
-    { name: "Numbers",     bollsBook: 4,  sefariaRef: "Numbers",     chapters: 36, maxVerse: 25 },
-    { name: "Deuteronomy", bollsBook: 5,  sefariaRef: "Deuteronomy", chapters: 34, maxVerse: 25 },
+    { name: "Genesis",     bollsBook: 1, sefariaRef: "Genesis",     chapters: 50 },
+    { name: "Exodus",      bollsBook: 2, sefariaRef: "Exodus",      chapters: 40 },
+    { name: "Leviticus",   bollsBook: 3, sefariaRef: "Leviticus",   chapters: 27 },
+    { name: "Numbers",     bollsBook: 4, sefariaRef: "Numbers",     chapters: 36 },
+    { name: "Deuteronomy", bollsBook: 5, sefariaRef: "Deuteronomy", chapters: 34 },
   ];
 
   const BOOK_NAMES_FR = {
@@ -66,13 +62,21 @@
   function formatDateFr(date) {
     return date.toLocaleDateString("fr-FR", {
       weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      year:    "numeric",
+      month:   "long",
+      day:     "numeric",
     });
   }
 
-  // ─── Nettoyage hébreu Sefaria ─────────────────────────────────────────────
+  // ─── Nettoyage texte ──────────────────────────────────────────────────────
+
+  function stripHtml(raw) {
+    if (!raw) return "";
+    return raw
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
 
   function cleanHebrew(raw) {
     if (!raw) return "";
@@ -81,16 +85,21 @@
     raw = raw
       .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
       .replace(/&nbsp;/g, " ").replace(/&thinsp;/g, "\u2009")
-      .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1),16)))
-      .replace(/&#\d+;/g, m => String.fromCodePoint(parseInt(m.slice(2,-1),10)));
+      .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1), 16)))
+      .replace(/&#\d+;/g,           m => String.fromCodePoint(parseInt(m.slice(2,-1), 10)));
     // Retire cantillations (U+0591–U+05AF) et ponctuation massorétique parasites
     raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
     return raw.replace(/\s{2,}/g, " ").trim();
   }
 
-  // ─── Sélection du verset ──────────────────────────────────────────────────
+  // ─── Sélection ────────────────────────────────────────────────────────────
 
-  function pickVerse(seed) {
+  /**
+   * Retourne { book, chapter, verseRatio }
+   * verseRatio ∈ [0, 1) — sera multiplié par le vrai nombre de versets du chapitre.
+   * On ne tire PAS un numéro de verset absolu ici pour éviter tout hors-limites.
+   */
+  function pickTarget(seed) {
     const rand = seededRng(seed);
     const totalChapters = TORAH_BOOKS.reduce((a, b) => a + b.chapters, 0);
     let r = rand() * totalChapters;
@@ -99,44 +108,30 @@
       r -= b.chapters;
       if (r <= 0) { book = b; break; }
     }
-    const chapter = 1 + Math.floor(rand() * book.chapters);
-    const verse   = 1 + Math.floor(rand() * book.maxVerse);
-    return { book, chapter, verse };
+    const chapter     = 1 + Math.floor(rand() * book.chapters);
+    const verseRatio  = rand(); // 0 ≤ verseRatio < 1
+    return { book, chapter, verseRatio };
   }
 
-  // ─── API bolls.life — Traduction française LSG ────────────────────────────
+  // ─── API bolls.life — chapitre entier ─────────────────────────────────────
 
   /**
-   * GET https://bolls.life/get-verse/LSG/{book}/{chapter}/{verse}/
-   * Retourne : { pk, verse, text, comment }
-   * Si le verset n'existe pas → retente avec verse=1
+   * GET https://bolls.life/get-chapter/LSG/{book}/{chapter}/
+   * Retourne un tableau de { pk, verse, text, comment }
    */
-  async function fetchFrench(bollsBook, chapter, verse, isRetry) {
-    const url = `https://bolls.life/get-verse/LSG/${bollsBook}/${chapter}/${verse}/`;
+  async function fetchChapter(bollsBook, chapter) {
+    const url = `https://bolls.life/get-chapter/LSG/${bollsBook}/${chapter}/`;
     const res = await fetch(url);
-    if (!res.ok) {
-      if (!isRetry) return fetchFrench(bollsBook, chapter, 1, true);
-      throw new Error(`bolls.life HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`bolls.life HTTP ${res.status} — livre ${bollsBook} ch.${chapter}`);
+    const verses = await res.json();
+    if (!Array.isArray(verses) || verses.length === 0) {
+      throw new Error(`Chapitre vide (livre ${bollsBook}, ch.${chapter})`);
     }
-    const data = await res.json();
-
-    // bolls.life renvoie du HTML dans le champ text — on le nettoie
-    let text = data.text || "";
-    text = text.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
-
-    if (!text) {
-      if (!isRetry) return fetchFrench(bollsBook, chapter, 1, true);
-      throw new Error("Verset vide (LSG).");
-    }
-
-    return { verseNumber: data.verse || verse, text };
+    return verses;
   }
 
-  // ─── API Sefaria — Texte hébreu ───────────────────────────────────────────
+  // ─── API Sefaria — texte hébreu (optionnel) ───────────────────────────────
 
-  /**
-   * Ne lève jamais d'exception — retourne "" si indisponible.
-   */
   async function fetchHebrew(sefariaRef, chapter, verse) {
     try {
       const ref = `${sefariaRef}.${chapter}.${verse}`;
@@ -153,19 +148,25 @@
 
   // ─── Orchestration ────────────────────────────────────────────────────────
 
-  async function fetchVerse(book, chapter, verse) {
-    // 1. Français d'abord (source principale, ne doit pas échouer)
-    const fr = await fetchFrench(book.bollsBook, chapter, verse, false);
+  async function fetchVerse(book, chapter, verseRatio) {
+    // 1. Charger tout le chapitre — on sait maintenant combien de versets il y a
+    const verses = await fetchChapter(book.bollsBook, chapter);
 
-    // 2. Hébreu en parallèle (optionnel)
-    const heText = await fetchHebrew(book.sefariaRef, chapter, fr.verseNumber);
+    // 2. Choisir un verset par ratio → jamais hors limites
+    const idx    = Math.floor(verseRatio * verses.length);
+    const picked = verses[Math.min(idx, verses.length - 1)];
+    const verseNumber = picked.verse;
+    const frText      = stripHtml(picked.text);
+
+    // 3. Hébreu via Sefaria (ne bloque pas si indisponible)
+    const heText = await fetchHebrew(book.sefariaRef, chapter, verseNumber);
 
     return {
       book:    book.name,
       chapter,
-      verse:   fr.verseNumber,
+      verse:   verseNumber,
       he:      heText,
-      fr:      fr.text,
+      fr:      frText,
     };
   }
 
@@ -217,9 +218,9 @@
   async function loadVerse(date) {
     setLoading(date);
     updateNavButtons(date);
-    const { book, chapter, verse } = pickVerse(dateToSeed(date));
+    const { book, chapter, verseRatio } = pickTarget(dateToSeed(date));
     try {
-      const verseData = await fetchVerse(book, chapter, verse);
+      const verseData = await fetchVerse(book, chapter, verseRatio);
       renderVerse(verseData, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
