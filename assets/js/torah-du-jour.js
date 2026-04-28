@@ -19,10 +19,6 @@
     Deuteronomy: "Devarim · Deutéronome",
   };
 
-  // ─── CACHE ─────────────────────────────────────────
-
-  const CHAPTER_CACHE = {};
-
   // ─── RNG ───────────────────────────────────────────
 
   function seededRng(seed) {
@@ -75,55 +71,37 @@
     }
   }
 
-  // ─── FETCH CHAPITRE (CORRIGÉ) ──────────────────────
+  // ─── API LSG (FIABLE) ──────────────────────────────
 
-async function fetchChapterLSG(bookId, chapter) {
+  async function fetchChapterLSG(bookId, chapter) {
 
-  const BOOK_API_NAMES = {
-    "1": "genesis",
-    "2": "exodus",
-    "3": "leviticus",
-    "4": "numbers",
-    "5": "deuteronomy"
-  };
+    const BOOK_API_NAMES = {
+      "1": "genesis",
+      "2": "exodus",
+      "3": "leviticus",
+      "4": "numbers",
+      "5": "deuteronomy"
+    };
 
-  const bookName = BOOK_API_NAMES[bookId];
-  const url = `https://bible-api.com/${bookName}+${chapter}?translation=lsg`;
+    const bookName = BOOK_API_NAMES[bookId];
+    const url = `https://bible-api.com/${bookName}+${chapter}?translation=lsg`;
 
-  const res = await fetch(url);
+    const res = await fetch(url);
 
-  if (!res.ok) {
-    throw new Error(`Erreur API ${res.status}`);
-  }
-
-  const data = await res.json();
-
-  if (!data.verses || data.verses.length === 0) {
-    throw new Error("Aucun verset trouvé");
-  }
-
-  return data.verses.map(v => ({
-    verse: v.verse,
-    text: v.text
-  }));
-}
-
-    // sécurité anti HTML
-    if (!res.headers.get("content-type")?.includes("application/json")) {
-      const text = await res.text();
-      console.error("Réponse non JSON :", text);
-      throw new Error("Réponse invalide");
+    if (!res.ok) {
+      throw new Error(`Erreur API ${res.status}`);
     }
 
     const data = await res.json();
 
-    const verses = Object.entries(data).map(([v, text]) => ({
-      verse: parseInt(v, 10),
-      text
-    }));
+    if (!data.verses || data.verses.length === 0) {
+      throw new Error("Aucun verset trouvé");
+    }
 
-    CHAPTER_CACHE[key] = verses;
-    return verses;
+    return data.verses.map(v => ({
+      verse: v.verse,
+      text: v.text
+    }));
   }
 
   // ─── SELECTION ─────────────────────────────────────
