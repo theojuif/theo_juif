@@ -19,21 +19,11 @@
     Deuteronomy: "Devarim · Deutéronome",
   };
 
-  // ─── DATA CACHE ─────────────────────────────────────
+  // ─── CACHE ─────────────────────────────────────────
 
-  let BIBLE_DATA = null;
+  const CHAPTER_CACHE = {};
 
-  async function loadBible() {
-    if (BIBLE_DATA) return BIBLE_DATA;
-
-    const url = "https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/fr_lsg.json";
-    const res = await fetch(url);
-    BIBLE_DATA = await res.json();
-
-    return BIBLE_DATA;
-  }
-
-  // ─── RNG ────────────────────────────────────────────
+  // ─── RNG ───────────────────────────────────────────
 
   function seededRng(seed) {
     let s = seed >>> 0;
@@ -52,7 +42,7 @@
     );
   }
 
-  // ─── UTILS DATE ─────────────────────────────────────
+  // ─── DATE ──────────────────────────────────────────
 
   function localMidnight(date) {
     const d = new Date(date);
@@ -66,7 +56,7 @@
     });
   }
 
-  // ─── HEBREU ─────────────────────────────────────────
+  // ─── HEBREU (optionnel) ────────────────────────────
 
   function cleanHebrew(raw) {
     if (!raw) return "";
@@ -85,7 +75,40 @@
     }
   }
 
-  // ─── SELECTION ──────────────────────────────────────
+  // ─── FETCH CHAPITRE (CORRIGÉ) ──────────────────────
+
+  async function fetchChapterLSG(bookId, chapter) {
+
+    const key = `${bookId}-${chapter}`;
+    if (CHAPTER_CACHE[key]) return CHAPTER_CACHE[key];
+
+    const url = `https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/fr_lsg/${bookId}/${chapter}.json`;
+
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      throw new Error(`Erreur chargement chapitre ${bookId}:${chapter}`);
+    }
+
+    // sécurité anti HTML
+    if (!res.headers.get("content-type")?.includes("application/json")) {
+      const text = await res.text();
+      console.error("Réponse non JSON :", text);
+      throw new Error("Réponse invalide");
+    }
+
+    const data = await res.json();
+
+    const verses = Object.entries(data).map(([v, text]) => ({
+      verse: parseInt(v, 10),
+      text
+    }));
+
+    CHAPTER_CACHE[key] = verses;
+    return verses;
+  }
+
+  // ─── SELECTION ─────────────────────────────────────
 
   function pickTarget(seed) {
     const rand = seededRng(seed);
@@ -103,23 +126,6 @@
     const verseRatio = rand();
 
     return { book, chapter, verseRatio };
-  }
-
-  // ─── LSG (LOCAL JSON) ───────────────────────────────
-
-  async function fetchChapterLSG(bookId, chapter) {
-    const data = await loadBible();
-
-    const book = data[bookId];
-    if (!book) throw new Error("Livre introuvable");
-
-    const chap = book[chapter];
-    if (!chap) throw new Error("Chapitre introuvable");
-
-    return Object.entries(chap).map(([v, text]) => ({
-      verse: parseInt(v,10),
-      text
-    }));
   }
 
   async function fetchVerse(book, chapter, ratio) {
@@ -162,7 +168,7 @@
     el("tdj-translation").textContent = v.fr;
   }
 
-  // ─── NAV ───────────────────────────────────────────
+  // ─── NAVIGATION ────────────────────────────────────
 
   let currentDate, today;
 
@@ -185,7 +191,7 @@
       render(v, date);
     } catch (e) {
       console.error(e);
-      setError("Erreur de chargement");
+      setError("Impossible de charger le verset.");
     }
   }
 
