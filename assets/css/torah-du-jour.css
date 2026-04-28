@@ -1,0 +1,104 @@
+```css
+/* ── Bloc principal ───────────────────────── */
+
+#tdj-wrapper {
+	margin: 2em 0;
+}
+
+.tdj-card {
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 8px;
+	padding: 2em;
+	transition: opacity 0.3s ease;
+}
+
+.tdj-card.tdj-loading {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+/* ── Texte ───────────────────────── */
+
+.tdj-date {
+	font-size: 0.85em;
+	opacity: 0.6;
+	margin-bottom: 0.5em;
+}
+
+.tdj-ref {
+	font-weight: bold;
+	margin-bottom: 1em;
+}
+
+.tdj-hebrew {
+	font-size: 1.5em;
+	line-height: 1.8;
+	text-align: right;
+	direction: rtl;
+	margin-bottom: 1em;
+	border-right: 3px solid #ccc;
+	padding-right: 10px;
+}
+
+.tdj-label {
+	font-size: 0.75em;
+	opacity: 0.5;
+	margin-bottom: 0.3em;
+	display: none;
+}
+
+.tdj-translation {
+	font-style: italic;
+	opacity: 0.8;
+}
+
+/* ── Navigation ───────────────────────── */
+
+.tdj-nav {
+	display: flex;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.tdj-nav button {
+	padding: 6px 12px;
+	cursor: pointer;
+}
+
+.tdj-nav button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* ── Erreur ───────────────────────── */
+
+.tdj-error {
+	display: none;
+	color: red;
+	margin-top: 10px;
+}
+
+/* ── Spinner ───────────────────────── */
+
+.tdj-spinner {
+	display: none;
+	width: 14px;
+	height: 14px;
+	border: 2px solid #ccc;
+	border-top: 2px solid #000;
+	border-radius: 50%;
+	animation: spin 0.7s linear infinite;
+	margin-right: 5px;
+}
+
+.tdj-loading .tdj-spinner {
+	display: inline-block;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+```
