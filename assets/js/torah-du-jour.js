@@ -1,24 +1,26 @@
 /**
  * torah-du-jour.js
- * Verset du jour depuis l'API Sefaria.
  *
- * Stratégie API :
- *  1. Appel v2 pour le texte hébreu (fiable, simple)
- *  2. Appel v3 séparé pour tenter la traduction française
- *  3. Fallback sur la traduction anglaise si le FR échoue
+ * Deux sources :
+ *  - Hébreu  : API Sefaria (texte massorétique, fiable)
+ *  - Français : API bible.helloao.org – Louis Segond 1910 (LSG)
+ *               domaine public, Torah complète, "l'Éternel" pour le nom divin
+ *
+ * Seed déterministe : même date = même verset. Jours futurs bloqués.
  */
 
 (function () {
   "use strict";
 
-  // ─── Configuration ────────────────────────────────────────────────────────
+  // ─── Torah books ──────────────────────────────────────────────────────────
 
+  // Livres avec leur nombre de chapitres ET leur identifiant LSG (helloao.org)
   const TORAH_BOOKS = [
-    { ref: "Genesis",     chapters: 50 },
-    { ref: "Exodus",      chapters: 40 },
-    { ref: "Leviticus",   chapters: 27 },
-    { ref: "Numbers",     chapters: 36 },
-    { ref: "Deuteronomy", chapters: 34 },
+    { ref: "Genesis",     lsg: "GEN", chapters: 50 },
+    { ref: "Exodus",      lsg: "EXO", chapters: 40 },
+    { ref: "Leviticus",   lsg: "LEV", chapters: 27 },
+    { ref: "Numbers",     lsg: "NUM", chapters: 36 },
+    { ref: "Deuteronomy", lsg: "DEU", chapters: 34 },
   ];
 
   const BOOK_NAMES_FR = {
@@ -28,8 +30,6 @@
     Numbers:     "Bamidbar · Nombres",
     Deuteronomy: "Devarim · Deutéronome",
   };
-
-  const MAX_VERSE_HINT = 25;
 
   // ─── PRNG déterministe (mulberry32) ──────────────────────────────────────
 
@@ -61,45 +61,37 @@
   function formatDateFr(date) {
     return date.toLocaleDateString("fr-FR", {
       weekday: "long",
-      year:    "numeric",
-      month:   "long",
-      day:     "numeric",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   }
 
-  // ─── Nettoyage du texte Sefaria ───────────────────────────────────────────
+  // ─── Nettoyage texte Sefaria ──────────────────────────────────────────────
 
-  function cleanText(raw) {
+  function cleanHebrew(raw) {
     if (!raw) return "";
     if (Array.isArray(raw)) raw = raw.flat(Infinity).join(" ");
-
-    // Retirer les balises HTML
     raw = raw.replace(/<[^>]+>/g, " ");
-
-    // Décoder les entités HTML
     raw = raw
-      .replace(/&amp;/g,   "&")
-      .replace(/&lt;/g,    "<")
-      .replace(/&gt;/g,    ">")
-      .replace(/&nbsp;/g,  " ")
-      .replace(/&thinsp;/g,"\u2009")
-      .replace(/&#x[\da-fA-F]+;/g, (m) =>
-        String.fromCodePoint(parseInt(m.slice(3, -1), 16))
-      )
-      .replace(/&#\d+;/g, (m) =>
-        String.fromCodePoint(parseInt(m.slice(2, -1), 10))
-      );
-
-    // Retirer les accents de cantillation (U+0591–U+05AF)
-    // et la ponctuation massorétique problématique
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ").replace(/&thinsp;/g, "\u2009")
+      .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1),16)))
+      .replace(/&#\d+;/g, m => String.fromCodePoint(parseInt(m.slice(2,-1),10)));
+    // Retire cantillations (U+0591–U+05AF) + ponctuation massorétique parasites
     raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
-
-    // Nettoyer les espaces multiples
     return raw.replace(/\s{2,}/g, " ").trim();
   }
 
-  // ─── Sélection aléatoire du verset ───────────────────────────────────────
+  // ─── Sélection aléatoire ──────────────────────────────────────────────────
 
+  /**
+   * Retourne { book, chapter, verseIndex }
+   * verseIndex est un indice 0-based dans le tableau des versets du chapitre.
+   * On ne connaît pas le nombre exact de versets avant d'appeler l'API LSG,
+   * donc on tire un nombre entre 0 et 29 (les chapitres ont rarement + de 30v).
+   * Si l'indice dépasse la longueur réelle, on prend le dernier verset.
+   */
   function pickVerse(seed) {
     const rand = seededRng(seed);
     const totalChapters = TORAH_BOOKS.reduce((a, b) => a + b.chapters, 0);
@@ -109,86 +101,80 @@
       r -= b.chapters;
       if (r <= 0) { book = b; break; }
     }
-    const chapter = 1 + Math.floor(rand() * book.chapters);
-    const verse   = 1 + Math.floor(rand() * MAX_VERSE_HINT);
-    return { book: book.ref, chapter, verse };
+    const chapter    = 1 + Math.floor(rand() * book.chapters);
+    const verseIndex = Math.floor(rand() * 30); // 0-based, clampé après appel API
+    return { book, chapter, verseIndex };
   }
 
-  // ─── Appels API Sefaria ───────────────────────────────────────────────────
+  // ─── API 1 : Hébreu via Sefaria ───────────────────────────────────────────
 
-  /**
-   * Appel principal : API v2 (la plus stable).
-   * Retourne le texte hébreu ET la traduction par défaut (EN).
-   */
-  async function fetchMain(ref) {
+  async function fetchHebrew(bookRef, chapter, verseNumber) {
+    const ref = `${bookRef}.${chapter}.${verseNumber}`;
     const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?context=0&commentary=0`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    if (!res.ok) throw new Error(`Sefaria HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return cleanHebrew(data.he);
   }
 
+  // ─── API 2 : Français via bible.helloao.org (LSG 1910) ───────────────────
+
   /**
-   * Appel secondaire : tente de récupérer la traduction française via v3.
-   * Ne lève jamais d'exception — retourne "" en cas d'échec.
+   * Récupère tout le chapitre d'un coup (plus efficace que verset par verset).
+   * Retourne un tableau de { number, text }.
    */
-  async function fetchFrench(ref) {
-    try {
-      // On demande uniquement la version française
-      const url = `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=fr&fill_in_missing_segments=1`;
-      const res = await fetch(url);
-      if (!res.ok) return "";
-      const data = await res.json();
-      if (!data.versions || data.versions.length === 0) return "";
-      for (const v of data.versions) {
-        const lang = (v.actualLanguage || v.language || "").toLowerCase();
-        if (lang === "fr") {
-          const t = cleanText(v.text);
-          if (t) return t;
-        }
+  async function fetchChapterLSG(lsgId, chapter) {
+    const url = `https://bible.helloao.org/api/LSG/${lsgId}/${chapter}.json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`LSG HTTP ${res.status}`);
+    const data = await res.json();
+
+    // La réponse helloao v2 : data.verses = [{ number, content: [{type,text}] }]
+    const verses = [];
+    for (const v of (data.verses || [])) {
+      // Concaténer tous les fragments de texte du verset
+      let text = "";
+      for (const block of (v.content || [])) {
+        if (block.type === "verse_start" || block.type === "verse_end") continue;
+        if (typeof block.text === "string") text += block.text;
+        if (typeof block     === "string") text += block;
       }
-      return "";
-    } catch (_) {
-      return "";
+      text = text.trim();
+      if (text) verses.push({ number: v.number, text });
     }
+    return verses;
   }
 
-  /**
-   * Orchestre les deux appels et construit l'objet verset final.
-   * Retente avec le verset 1 si le verset demandé n'existe pas.
-   */
-  async function fetchVerse(book, chapter, verseHint, isRetry) {
-    const ref = `${book}.${chapter}.${verseHint}`;
+  // ─── Orchestration principale ─────────────────────────────────────────────
 
-    const data = await fetchMain(ref);
+  async function fetchVerse(book, chapter, verseIndex) {
+    // 1. Récupérer le chapitre en français (LSG)
+    const verses = await fetchChapterLSG(book.lsg, chapter);
+    if (!verses.length) throw new Error("Chapitre introuvable (LSG).");
 
-    // Sefaria renvoie un champ "error" si la référence est invalide
-    if (data.error) {
-      if (!isRetry) return fetchVerse(book, chapter, 1, true);
-      throw new Error(data.error);
+    // 2. Clamp l'index si besoin
+    const idx    = Math.min(verseIndex, verses.length - 1);
+    const picked = verses[idx];
+
+    // 3. Récupérer le texte hébreu du même verset via Sefaria
+    let heText = "";
+    try {
+      heText = await fetchHebrew(book.ref, chapter, picked.number);
+    } catch (e) {
+      console.warn("[torah-du-jour] Hébreu indisponible :", e.message);
     }
 
-    const heText = cleanText(data.he);
-    const enText = cleanText(data.text);
-
-    // Texte hébreu vide = verset hors limites
-    if (!heText && !isRetry) return fetchVerse(book, chapter, 1, true);
-    if (!heText) throw new Error("Verset introuvable.");
-
-    // Tentative de traduction française (en parallèle avec ce qu'on a déjà)
-    const frText = await fetchFrench(ref);
-
-    const translation     = frText || enText;
-    const translationLang = frText ? "fr" : (enText ? "en" : "");
-
-    // Numéro de verset réel renvoyé par Sefaria
-    const realVerse = data.sections
-      ? data.sections[data.sections.length - 1]
-      : verseHint;
-
-    return { book, chapter, verse: realVerse, he: heText, translation, translationLang };
+    return {
+      book:        book.ref,
+      chapter,
+      verse:       picked.number,
+      he:          heText,
+      translation: picked.text,
+    };
   }
 
-  // ─── Rendu DOM ────────────────────────────────────────────────────────────
+  // ─── DOM ──────────────────────────────────────────────────────────────────
 
   function el(id) { return document.getElementById(id); }
 
@@ -210,26 +196,21 @@
   }
 
   function renderVerse(verseData, date) {
-    const bookFr    = BOOK_NAMES_FR[verseData.book] || verseData.book;
-    const langLabel = verseData.translationLang === "fr"
-      ? "Traduction française · André Chouraqui"
-      : "Traduction · anglais";
-
+    const bookFr = BOOK_NAMES_FR[verseData.book] || verseData.book;
     el("tdj-date").textContent        = formatDateFr(date);
     el("tdj-ref").textContent         =
       `${bookFr} — chapitre ${verseData.chapter}, verset ${verseData.verse}`;
-    el("tdj-he").textContent          = verseData.he;
+    el("tdj-he").textContent          = verseData.he || "";
     el("tdj-translation").textContent = verseData.translation;
-    el("tdj-label").textContent       = langLabel;
-    el("tdj-label").style.display     = verseData.translation ? "block" : "none";
+    el("tdj-label").textContent       = "Traduction française · Louis Segond 1910";
+    el("tdj-label").style.display     = "block";
     el("tdj-error").style.display     = "none";
     el("tdj-content").classList.remove("tdj-loading");
   }
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
-  let currentDate;
-  let today;
+  let currentDate, today;
 
   function updateNavButtons(date) {
     const nextDay = new Date(date);
@@ -242,10 +223,9 @@
   async function loadVerse(date) {
     setLoading(date);
     updateNavButtons(date);
-    const seed   = dateToSeed(date);
-    const picked = pickVerse(seed);
+    const { book, chapter, verseIndex } = pickVerse(dateToSeed(date));
     try {
-      const verseData = await fetchVerse(picked.book, picked.chapter, picked.verse, false);
+      const verseData = await fetchVerse(book, chapter, verseIndex);
       renderVerse(verseData, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
@@ -254,11 +234,10 @@
   }
 
   function navigate(deltaDays) {
-    const next = new Date(currentDate);
+    const next = localMidnight(new Date(currentDate));
     next.setDate(next.getDate() + deltaDays);
-    const nextMidnight = localMidnight(next);
-    if (nextMidnight > today) return;
-    currentDate = nextMidnight;
+    if (next > today) return;
+    currentDate = next;
     loadVerse(currentDate);
   }
 
