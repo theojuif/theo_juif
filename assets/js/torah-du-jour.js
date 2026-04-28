@@ -77,18 +77,36 @@
 
   // ─── FETCH CHAPITRE (CORRIGÉ) ──────────────────────
 
-  async function fetchChapterLSG(bookId, chapter) {
+async function fetchChapterLSG(bookId, chapter) {
 
-    const key = `${bookId}-${chapter}`;
-    if (CHAPTER_CACHE[key]) return CHAPTER_CACHE[key];
+  const BOOK_API_NAMES = {
+    "1": "genesis",
+    "2": "exodus",
+    "3": "leviticus",
+    "4": "numbers",
+    "5": "deuteronomy"
+  };
 
-    const url = `https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/fr_lsg/${bookId}/${chapter}.json`;
+  const bookName = BOOK_API_NAMES[bookId];
+  const url = `https://bible-api.com/${bookName}+${chapter}?translation=lsg`;
 
-    const res = await fetch(url);
+  const res = await fetch(url);
 
-    if (!res.ok) {
-      throw new Error(`Erreur chargement chapitre ${bookId}:${chapter}`);
-    }
+  if (!res.ok) {
+    throw new Error(`Erreur API ${res.status}`);
+  }
+
+  const data = await res.json();
+
+  if (!data.verses || data.verses.length === 0) {
+    throw new Error("Aucun verset trouvé");
+  }
+
+  return data.verses.map(v => ({
+    verse: v.verse,
+    text: v.text
+  }));
+}
 
     // sécurité anti HTML
     if (!res.headers.get("content-type")?.includes("application/json")) {
