@@ -1,242 +1,68 @@
+```html
 <!DOCTYPE HTML>
-<!--
-	Landed by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
 <html>
 <head>
 	<title>Torah du jour</title>
 	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<!-- CSS principal -->
 	<link rel="stylesheet" href="assets/css/main.css" />
-	<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	<link rel="stylesheet" href="assets/css/torah-du-jour.css" />
+
 	<link rel="icon" href="images/favicon.ico" type="image/x-icon" />
-	<style>
-		/* ── Bloc verset du jour ─────────────────────────────── */
- 
-		#tdj-wrapper {
-			margin: 2em 0;
-		}
- 
-		/* Carte principale */
-		.tdj-card {
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid rgba(255, 255, 255, 0.12);
-			border-radius: 8px;
-			padding: 2em 2.5em;
-			position: relative;
-			transition: opacity 0.3s ease;
-		}
- 
-		.tdj-card.tdj-loading {
-			opacity: 0.45;
-			pointer-events: none;
-		}
- 
-		/* Date du jour */
-		.tdj-date {
-			font-size: 0.85em;
-			text-transform: uppercase;
-			letter-spacing: 0.12em;
-			opacity: 0.55;
-			margin-bottom: 0.4em;
-		}
- 
-		/* Référence (livre, chapitre, verset) */
-		.tdj-ref {
-			font-size: 1.05em;
-			font-weight: 600;
-			margin-bottom: 1.4em;
-			color: inherit;
-			opacity: 0.85;
-		}
- 
-		/* Texte hébreu */
-		.tdj-hebrew {
-			font-size: 1.6em;
-			line-height: 1.9;
-			text-align: right;
-			direction: rtl;
-			font-family: "Times New Roman", "David", serif;
-			margin-bottom: 1.2em;
-			letter-spacing: 0.03em;
-			border-right: 3px solid currentColor;
-			padding-right: 1em;
-			opacity: 0.9;
-		}
- 
-		/* Label "Traduction" */
-		.tdj-label {
-			font-size: 0.75em;
-			text-transform: uppercase;
-			letter-spacing: 0.1em;
-			opacity: 0.4;
-			margin-bottom: 0.3em;
-			display: none; /* affiché via JS */
-		}
- 
-		/* Texte anglais (traduction) */
-		.tdj-english {
-			font-size: 1em;
-			line-height: 1.75;
-			font-style: italic;
-			opacity: 0.7;
-		}
- 
-		/* Message d'erreur */
-		.tdj-error {
-			display: none;
-			color: #e06060;
-			background: rgba(220, 60, 60, 0.08);
-			border: 1px solid rgba(220, 60, 60, 0.25);
-			border-radius: 5px;
-			padding: 0.9em 1.2em;
-			font-size: 0.9em;
-		}
- 
-		/* ── Navigation ─────────────────────────────────────── */
- 
-		.tdj-nav {
-			display: flex;
-			align-items: center;
-			gap: 0.75em;
-			margin-top: 1.8em;
-			flex-wrap: wrap;
-		}
- 
-		.tdj-nav button {
-			cursor: pointer;
-			border-radius: 4px;
-			font-size: 0.85em;
-			padding: 0.5em 1.1em;
-			transition: opacity 0.2s, transform 0.15s;
-			line-height: 1;
-		}
- 
-		.tdj-nav button:disabled {
-			opacity: 0.3;
-			cursor: not-allowed;
-			transform: none !important;
-		}
- 
-		.tdj-nav button:not(:disabled):hover {
-			transform: translateY(-1px);
-		}
- 
-		/* Bouton "Aujourd'hui" légèrement différencié */
-		#tdj-today {
-			margin-left: auto;
-			opacity: 0.6;
-			font-size: 0.78em;
-		}
- 
-		/* Spinner de chargement discret */
-		.tdj-spinner {
-			display: inline-block;
-			width: 14px;
-			height: 14px;
-			border: 2px solid rgba(255,255,255,0.2);
-			border-top-color: rgba(255,255,255,0.7);
-			border-radius: 50%;
-			animation: tdj-spin 0.7s linear infinite;
-			vertical-align: middle;
-			margin-right: 0.4em;
-			display: none;
-		}
- 
-		.tdj-loading .tdj-spinner {
-			display: inline-block;
-		}
- 
-		@keyframes tdj-spin {
-			to { transform: rotate(360deg); }
-		}
-	</style>
 </head>
-<body class="is-preload">
+
+<body>
+
 	<div id="page-wrapper">
- 
-		<!-- Header -->
+
 		<header id="header">
-			<h1 id="logo"><a href="index.html">Théo Juif</a></h1>
-			<nav id="nav">
-				<ul>
-					<li><a href="index.html">Accueil</a></li>
-					<li><a href="projet.html">Notre projet</a></li>
-					<li><a href="cagnotte.html">La cagnotte</a></li>
-					<li><a href="contact.html" class="active">Contact &amp; Partenaires</a></li>
-				</ul>
-			</nav>
+			<h1><a href="index.html">Théo Juif</a></h1>
 		</header>
- 
-		<!-- Main -->
-		<div id="main" class="wrapper style1">
+
+		<div id="main">
 			<div class="container">
- 
-				<header class="major">
-					<h2>Le verset du jour</h2>
-					<p>Tous les jours, découvrez un nouveau verset de la Torah</p>
-				</header>
- 
-				<!-- Contenu -->
-				<section id="content">
-					<div id="tdj-wrapper">
- 
-						<!-- Carte verset -->
-						<div class="tdj-card" id="tdj-content">
-							<div class="tdj-date" id="tdj-date">Chargement…</div>
-							<div class="tdj-ref"  id="tdj-ref"></div>
- 
-							<div class="tdj-hebrew"  id="tdj-he"></div>
- 
-							<div class="tdj-label" id="tdj-fr-label">Traduction (anglais)</div>
-							<div class="tdj-english" id="tdj-en"></div>
- 
-							<div class="tdj-error" id="tdj-error"></div>
+
+				<h2>Le verset du jour</h2>
+				<p>Tous les jours, découvrez un nouveau verset de la Torah</p>
+
+				<section id="tdj-wrapper">
+
+					<div class="tdj-card" id="tdj-content">
+
+						<div class="tdj-date" id="tdj-date">
+							<span class="tdj-spinner"></span>
+							Chargement…
 						</div>
- 
-						<!-- Navigation jours -->
-						<nav class="tdj-nav" aria-label="Navigation entre les jours">
-							<button id="tdj-prev" class="button small" aria-label="Jour précédent">
-								&#8592; Jour précédent
-							</button>
-							<button id="tdj-next" class="button small" aria-label="Jour suivant" disabled>
-								Jour suivant &#8594;
-							</button>
-							<button id="tdj-today" class="button small alt" aria-label="Revenir à aujourd'hui" disabled>
-								Aujourd'hui
-							</button>
-						</nav>
- 
+
+						<div class="tdj-ref" id="tdj-ref"></div>
+
+						<div class="tdj-hebrew" id="tdj-he"></div>
+
+						<div class="tdj-label" id="tdj-tr-label"></div>
+						<div class="tdj-translation" id="tdj-translation"></div>
+
+						<div class="tdj-error" id="tdj-error"></div>
+
 					</div>
+
+					<nav class="tdj-nav">
+						<button id="tdj-prev">← Jour précédent</button>
+						<button id="tdj-next" disabled>Jour suivant →</button>
+						<button id="tdj-today" disabled>Aujourd'hui</button>
+					</nav>
+
 				</section>
- 
+
 			</div>
 		</div>
- 
-		<!-- Footer -->
-		<footer id="footer">
-			<ul class="copyright">
-				<li>&copy; 2025 Théo Juif. Tous droits réservés.</li>
-				<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
-				<li><a href="#">Haut de page</a></li>
-			</ul>
-		</footer>
- 
+
 	</div>
- 
-	<!-- Scripts -->
-	<script src="assets/js/jquery.min.js"></script>
-	<script src="assets/js/jquery.scrolly.min.js"></script>
-	<script src="assets/js/jquery.dropotron.min.js"></script>
-	<script src="assets/js/jquery.scrollex.min.js"></script>
-	<script src="assets/js/browser.min.js"></script>
-	<script src="assets/js/breakpoints.min.js"></script>
-	<script src="assets/js/util.js"></script>
-	<script src="assets/js/main.js"></script>
-	<script src="assets/js/duolingo.js"></script>
-	<!-- Verset du jour -->
+
+	<!-- JS -->
 	<script src="assets/js/torah-du-jour.js"></script>
+
 </body>
 </html>
+```
