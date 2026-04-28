@@ -1,68 +1,102 @@
-```html
 <!DOCTYPE HTML>
+<!--
+	Landed by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
 <html>
 <head>
-	<title>Torah du jour</title>
+	<title>Torah du jour - Théo Juif</title>
 	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
-
-	<!-- CSS principal -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<link rel="stylesheet" href="assets/css/main.css" />
 	<link rel="stylesheet" href="assets/css/torah-du-jour.css" />
-
+	<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	<link rel="icon" href="images/favicon.ico" type="image/x-icon" />
 </head>
-
-<body>
-
+<body class="is-preload">
 	<div id="page-wrapper">
 
+		<!-- Header -->
 		<header id="header">
-			<h1><a href="index.html">Théo Juif</a></h1>
+			<h1 id="logo"><a href="index.html">Théo Juif</a></h1>
+			<nav id="nav">
+				<ul>
+					<li><a href="index.html">Accueil</a></li>
+					<li><a href="projet.html">Notre projet</a></li>
+					<li><a href="cagnotte.html">La cagnotte</a></li>
+					<li><a href="contact.html" class="active">Contact &amp; Partenaires</a></li>
+				</ul>
+			</nav>
 		</header>
 
-		<div id="main">
+		<!-- Main -->
+		<div id="main" class="wrapper style1">
 			<div class="container">
 
-				<h2>Le verset du jour</h2>
-				<p>Tous les jours, découvrez un nouveau verset de la Torah</p>
+				<header class="major">
+					<h2>Le verset du jour</h2>
+					<p>Tous les jours, découvrez un nouveau verset de la Torah</p>
+				</header>
 
-				<section id="tdj-wrapper">
+				<!-- Contenu -->
+				<section id="content">
+					<div id="tdj-wrapper">
 
-					<div class="tdj-card" id="tdj-content">
+						<!-- Carte verset -->
+						<div class="tdj-card" id="tdj-content">
+							<p class="tdj-date" id="tdj-date">Chargement…</p>
+							<p class="tdj-ref"  id="tdj-ref"></p>
 
-						<div class="tdj-date" id="tdj-date">
-							<span class="tdj-spinner"></span>
-							Chargement…
+							<p class="tdj-hebrew" id="tdj-he" lang="he" dir="rtl"></p>
+
+							<p class="tdj-label" id="tdj-label"></p>
+							<p class="tdj-french" id="tdj-translation"></p>
+
+							<p class="tdj-error" id="tdj-error"></p>
 						</div>
 
-						<div class="tdj-ref" id="tdj-ref"></div>
-
-						<div class="tdj-hebrew" id="tdj-he"></div>
-
-						<div class="tdj-label" id="tdj-tr-label"></div>
-						<div class="tdj-translation" id="tdj-translation"></div>
-
-						<div class="tdj-error" id="tdj-error"></div>
+						<!-- Navigation jours -->
+						<nav class="tdj-nav" aria-label="Navigation entre les jours">
+							<button id="tdj-prev" class="button small" aria-label="Jour précédent">
+								&#8592; Jour précédent
+							</button>
+							<button id="tdj-next" class="button small" aria-label="Jour suivant" disabled>
+								Jour suivant &#8594;
+							</button>
+							<button id="tdj-today" class="button small alt" aria-label="Revenir à aujourd'hui" disabled>
+								Aujourd'hui
+							</button>
+						</nav>
 
 					</div>
-
-					<nav class="tdj-nav">
-						<button id="tdj-prev">← Jour précédent</button>
-						<button id="tdj-next" disabled>Jour suivant →</button>
-						<button id="tdj-today" disabled>Aujourd'hui</button>
-					</nav>
-
 				</section>
 
 			</div>
 		</div>
 
+		<!-- Footer -->
+		<footer id="footer">
+			<ul class="copyright">
+				<li>&copy; 2025 Théo Juif. Tous droits réservés.</li>
+				<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+				<li><a href="#">Haut de page</a></li>
+			</ul>
+		</footer>
+
 	</div>
 
-	<!-- JS -->
+	<!-- Scripts -->
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/jquery.dropotron.min.js"></script>
+	<script src="assets/js/jquery.scrollex.min.js"></script>
+	<script src="assets/js/browser.min.js"></script>
+	<script src="assets/js/breakpoints.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+	<script src="assets/js/duolingo.js"></script>
+	<!-- Verset du jour -->
 	<script src="assets/js/torah-du-jour.js"></script>
-
 </body>
 </html>
-```
