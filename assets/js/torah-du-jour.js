@@ -1,14 +1,11 @@
 /**
  * torah-du-jour.js
- * Verset du jour depuis l'API Sefaria (v3).
+ * Verset du jour depuis l'API Sefaria.
  *
- * Fonctionnalités :
- *  - Seed déterministe basé sur la date → même jour = même verset
- *  - Jours futurs bloqués
- *  - Navigation vers les jours précédents
- *  - Texte hébreu + traduction française (André Chouraqui via Sefaria)
- *  - Fallback sur traduction anglaise si le FR n'est pas disponible
- *  - Nettoyage du HTML et des cantillations problématiques
+ * Stratégie API :
+ *  1. Appel v2 pour le texte hébreu (fiable, simple)
+ *  2. Appel v3 séparé pour tenter la traduction française
+ *  3. Fallback sur la traduction anglaise si le FR échoue
  */
 
 (function () {
@@ -72,29 +69,20 @@
 
   // ─── Nettoyage du texte Sefaria ───────────────────────────────────────────
 
-  /**
-   * Nettoie le texte renvoyé par Sefaria :
-   *  - Aplatit les tableaux imbriqués
-   *  - Retire les balises HTML (<b>, <i>, <span class="maqaf">…)
-   *  - Décode les entités HTML
-   *  - Retire les accents de cantillation (U+0591–U+05AF) qui provoquent
-   *    les sauts de ligne et décalages visuels signalés
-   *  - Garde le niqqud (voyelles U+05B0–U+05BD) pour la lisibilité
-   */
   function cleanText(raw) {
     if (!raw) return "";
     if (Array.isArray(raw)) raw = raw.flat(Infinity).join(" ");
 
-    // Balises HTML → espace (évite de coller deux mots)
+    // Retirer les balises HTML
     raw = raw.replace(/<[^>]+>/g, " ");
 
-    // Entités HTML
+    // Décoder les entités HTML
     raw = raw
-      .replace(/&amp;/g,  "&")
-      .replace(/&lt;/g,   "<")
-      .replace(/&gt;/g,   ">")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&thinsp;/g, "\u2009")
+      .replace(/&amp;/g,   "&")
+      .replace(/&lt;/g,    "<")
+      .replace(/&gt;/g,    ">")
+      .replace(/&nbsp;/g,  " ")
+      .replace(/&thinsp;/g,"\u2009")
       .replace(/&#x[\da-fA-F]+;/g, (m) =>
         String.fromCodePoint(parseInt(m.slice(3, -1), 16))
       )
@@ -102,15 +90,12 @@
         String.fromCodePoint(parseInt(m.slice(2, -1), 10))
       );
 
-    // Accents de cantillation hébraïque U+0591–U+05AF
-    // + ponctuation massorétique problématique : maqaf U+05BE,
-    //   paseq U+05C0, sof pasuq U+05C3, nun hafukha U+05C6, U+05C7
+    // Retirer les accents de cantillation (U+0591–U+05AF)
+    // et la ponctuation massorétique problématique
     raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
 
-    // Espaces multiples
-    raw = raw.replace(/\s{2,}/g, " ").trim();
-
-    return raw;
+    // Nettoyer les espaces multiples
+    return raw.replace(/\s{2,}/g, " ").trim();
   }
 
   // ─── Sélection aléatoire du verset ───────────────────────────────────────
@@ -129,57 +114,75 @@
     return { book: book.ref, chapter, verse };
   }
 
-  // ─── Appel API Sefaria v3 ─────────────────────────────────────────────────
+  // ─── Appels API Sefaria ───────────────────────────────────────────────────
 
   /**
-   * Récupère hébreu + traduction FR (fallback EN) via l'API v3 de Sefaria.
-   * Un seul appel HTTP suffit grâce au paramètre version multiple.
-   * Si le verset est hors limites, on retente avec le verset 1.
+   * Appel principal : API v2 (la plus stable).
+   * Retourne le texte hébreu ET la traduction par défaut (EN).
    */
-  async function fetchVerse(book, chapter, verseHint) {
-    const ref = `${book}.${chapter}.${verseHint}`;
-    // Demande simultanément : hébreu massorétique, traduction FR, traduction EN
-    const params = new URLSearchParams();
-    params.append("version", "he|Miqra according to the Masorah");
-    params.append("version", "fr|La Bible d'André Chouraqui");
-    params.append("version", "en|The Contemporary Torah, Jewish Publication Society, 2006");
-    params.append("fill_in_missing_segments", "1");
-
-    const url = `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?${params}`;
-
+  async function fetchMain(ref) {
+    const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?context=0&commentary=0`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    return res.json();
+  }
 
-    if (!data.versions || data.versions.length === 0) {
-      if (verseHint !== 1) return fetchVerse(book, chapter, 1);
-      throw new Error("Aucune version disponible.");
+  /**
+   * Appel secondaire : tente de récupérer la traduction française via v3.
+   * Ne lève jamais d'exception — retourne "" en cas d'échec.
+   */
+  async function fetchFrench(ref) {
+    try {
+      // On demande uniquement la version française
+      const url = `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=fr&fill_in_missing_segments=1`;
+      const res = await fetch(url);
+      if (!res.ok) return "";
+      const data = await res.json();
+      if (!data.versions || data.versions.length === 0) return "";
+      for (const v of data.versions) {
+        const lang = (v.actualLanguage || v.language || "").toLowerCase();
+        if (lang === "fr") {
+          const t = cleanText(v.text);
+          if (t) return t;
+        }
+      }
+      return "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /**
+   * Orchestre les deux appels et construit l'objet verset final.
+   * Retente avec le verset 1 si le verset demandé n'existe pas.
+   */
+  async function fetchVerse(book, chapter, verseHint, isRetry) {
+    const ref = `${book}.${chapter}.${verseHint}`;
+
+    const data = await fetchMain(ref);
+
+    // Sefaria renvoie un champ "error" si la référence est invalide
+    if (data.error) {
+      if (!isRetry) return fetchVerse(book, chapter, 1, true);
+      throw new Error(data.error);
     }
 
-    let heText = "";
-    let frText = "";
-    let enText = "";
+    const heText = cleanText(data.he);
+    const enText = cleanText(data.text);
 
-    for (const v of data.versions) {
-      const lang = (v.actualLanguage || v.language || "").toLowerCase();
-      const text = cleanText(v.text);
-      if (!text) continue;
-      if (lang === "he" && !heText) heText = text;
-      if (lang === "fr" && !frText) frText = text;
-      if (lang === "en" && !enText) enText = text;
-    }
+    // Texte hébreu vide = verset hors limites
+    if (!heText && !isRetry) return fetchVerse(book, chapter, 1, true);
+    if (!heText) throw new Error("Verset introuvable.");
 
-    // Verset inexistant → fallback v.1
-    if (!heText && verseHint !== 1) return fetchVerse(book, chapter, 1);
+    // Tentative de traduction française (en parallèle avec ce qu'on a déjà)
+    const frText = await fetchFrench(ref);
 
     const translation     = frText || enText;
     const translationLang = frText ? "fr" : (enText ? "en" : "");
 
-    // Numéro de verset réel
-    const realVerse = data.ref
-      ? (parseInt(data.ref.split(":").pop(), 10) ||
-         parseInt(data.ref.split(".").pop(), 10) ||
-         verseHint)
+    // Numéro de verset réel renvoyé par Sefaria
+    const realVerse = data.sections
+      ? data.sections[data.sections.length - 1]
       : verseHint;
 
     return { book, chapter, verse: realVerse, he: heText, translation, translationLang };
@@ -242,7 +245,7 @@
     const seed   = dateToSeed(date);
     const picked = pickVerse(seed);
     try {
-      const verseData = await fetchVerse(picked.book, picked.chapter, picked.verse);
+      const verseData = await fetchVerse(picked.book, picked.chapter, picked.verse, false);
       renderVerse(verseData, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
