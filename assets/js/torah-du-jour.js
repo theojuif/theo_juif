@@ -1,35 +1,24 @@
 (function () {
   "use strict";
 
-  // ─── CONFIG ─────────────────────────────────────────
-
-  const TORAH_BOOKS = [
-    { name: "Genesis", id: "1", chapters: 50 },
-    { name: "Exodus", id: "2", chapters: 40 },
-    { name: "Leviticus", id: "3", chapters: 27 },
-    { name: "Numbers", id: "4", chapters: 36 },
-    { name: "Deuteronomy", id: "5", chapters: 34 },
-  ];
-
-  const BOOK_NAMES_FR = {
-    Genesis: "Bereshit · Genèse",
-    Exodus: "Shemot · Exode",
-    Leviticus: "Vayikra · Lévitique",
-    Numbers: "Bamidbar · Nombres",
-    Deuteronomy: "Devarim · Deutéronome",
-  };
-
-  let TORAH = null;
+  const el = (id) => document.getElementById(id);
 
   async function loadTorah() {
-    if (TORAH) return TORAH;
+    const res = await fetch("/fr_apee.json");
 
-    const res = await fetch("/torah.json");
-    TORAH = await res.json();
-    return TORAH;
+    if (!res.ok) {
+      throw new Error("JSON introuvable (404) → vérifie emplacement du fichier");
+    }
+
+    const text = await res.text();
+
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("Contenu reçu :", text);
+      throw new Error("JSON invalide (tu reçois du HTML au lieu du JSON)");
+    }
   }
-
-  // ─── RNG ───────────────────────────────────────────
 
   function seededRng(seed) {
     let s = seed >>> 0;
@@ -43,15 +32,14 @@
 
   function dateToSeed(date) {
     return parseInt(
-      `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}`,
-      10
+      `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}`
     );
   }
 
-  function localMidnight(date) {
-    const d = new Date(date);
-    d.setHours(0,0,0,0);
-    return d;
+  function localMidnight(d) {
+    const x = new Date(d);
+    x.setHours(0,0,0,0);
+    return x;
   }
 
   function formatDateFr(date) {
@@ -60,98 +48,58 @@
     });
   }
 
-  // ─── HEBREU ─────────────────────────────────────────
-
-  async function fetchHebrew(book, chapter, verse) {
-    try {
-      const url = `https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`;
-      const res = await fetch(url);
-      const data = await res.json();
-      return (data.he || "").replace(/<[^>]+>/g,"");
-    } catch {
-      return "";
-    }
-  }
-
-  // ─── FETCH LOCAL ───────────────────────────────────
-
-  async function fetchChapter(bookId, chapter) {
-    const data = await loadTorah();
-
-    const book = data[bookId];
-    if (!book) throw new Error("Livre introuvable");
-
-    const chap = book[chapter];
-    if (!chap) throw new Error("Chapitre introuvable");
-
-    return Object.entries(chap).map(([v, text]) => ({
-      verse: parseInt(v,10),
-      text
-    }));
-  }
-
-  function pickTarget(seed) {
+  function pick(seed) {
     const rand = seededRng(seed);
 
-    const total = TORAH_BOOKS.reduce((a,b)=>a+b.chapters,0);
-    let r = rand() * total;
+    const books = ["1","2","3","4","5"];
+    const book = books[Math.floor(rand() * books.length)];
 
-    let book = TORAH_BOOKS[0];
-    for (const b of TORAH_BOOKS) {
-      r -= b.chapters;
-      if (r <= 0) { book = b; break; }
-    }
-
-    const chapter = 1 + Math.floor(rand()*book.chapters);
+    const chapter = 1 + Math.floor(rand() * 40);
     const verseRatio = rand();
 
     return { book, chapter, verseRatio };
   }
 
-  async function fetchVerse(book, chapter, ratio) {
-    const verses = await fetchChapter(book.id, chapter);
+  async function getVerse(data, bookId, chapter, ratio) {
+    const book = Object.values(data)[bookId - 1];
+    const chap = book?.[chapter];
+
+    if (!chap) throw new Error("Chapitre introuvable");
+
+    const verses = Object.entries(chap).map(([v, text]) => ({
+      verse: Number(v),
+      text
+    }));
 
     const idx = Math.min(Math.floor(ratio * verses.length), verses.length - 1);
-    const v = verses[idx];
 
-    const he = await fetchHebrew(book.name, chapter, v.verse);
-
-    return {
-      book: book.name,
-      chapter,
-      verse: v.verse,
-      fr: v.text,
-      he
-    };
+    return verses[idx];
   }
 
-  // ─── DOM ───────────────────────────────────────────
+  async function render(date) {
+    el("tdj-ref").textContent = "Chargement...";
 
-  const el = id => document.getElementById(id);
-
-  function render(v, date) {
-    el("tdj-date").textContent = formatDateFr(date);
-    el("tdj-ref").textContent =
-      `${BOOK_NAMES_FR[v.book]} — chapitre ${v.chapter}, verset ${v.verse}`;
-    el("tdj-he").textContent = v.he;
-    el("tdj-translation").textContent = v.fr;
-  }
-
-  let currentDate, today;
-
-  async function load(date) {
-    const { book, chapter, verseRatio } = pickTarget(dateToSeed(date));
     try {
-      render(await fetchVerse(book, chapter, verseRatio), date);
+      const data = await loadTorah();
+
+      const { book, chapter, verseRatio } = pick(dateToSeed(date));
+
+      const v = await getVerse(data, book, chapter, verseRatio);
+
+      el("tdj-ref").textContent = `Verset ${v.verse}`;
+      el("tdj-translation").textContent = v.text;
+
+      el("tdj-date").textContent = formatDateFr(date);
+
     } catch (e) {
       console.error(e);
+      el("tdj-ref").textContent = "Erreur : fichier JSON introuvable ou mal placé";
     }
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    today = localMidnight(new Date());
-    currentDate = today;
-    load(today);
+    const today = localMidnight(new Date());
+    render(today);
   });
 
 })();
