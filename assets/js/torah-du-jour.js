@@ -1,15 +1,21 @@
 /**
  * torah-du-jour.js
- * Génère un verset aléatoire de la Torah basé sur la date.
- * Même date = même verset. Jours futurs bloqués. Navigation vers le passé possible.
- * Traduction française via Sefaria (Chouraqui), fallback anglais.
+ * Verset du jour depuis l'API Sefaria (v3).
+ *
+ * Fonctionnalités :
+ *  - Seed déterministe basé sur la date → même jour = même verset
+ *  - Jours futurs bloqués
+ *  - Navigation vers les jours précédents
+ *  - Texte hébreu + traduction française (André Chouraqui via Sefaria)
+ *  - Fallback sur traduction anglaise si le FR n'est pas disponible
+ *  - Nettoyage du HTML et des cantillations problématiques
  */
- 
+
 (function () {
   "use strict";
- 
+
   // ─── Configuration ────────────────────────────────────────────────────────
- 
+
   const TORAH_BOOKS = [
     { ref: "Genesis",     chapters: 50 },
     { ref: "Exodus",      chapters: 40 },
@@ -17,7 +23,7 @@
     { ref: "Numbers",     chapters: 36 },
     { ref: "Deuteronomy", chapters: 34 },
   ];
- 
+
   const BOOK_NAMES_FR = {
     Genesis:     "Bereshit · Genèse",
     Exodus:      "Shemot · Exode",
@@ -25,16 +31,11 @@
     Numbers:     "Bamidbar · Nombres",
     Deuteronomy: "Devarim · Deutéronome",
   };
- 
-  // Versions Sefaria : "langue|Titre exact de la version"
-  const FR_VERSION  = "fr|La bible d'André Chouraqui";
-  const HE_VERSION  = "he|Tanach with Nikkud";
-  const EN_FALLBACK = "en|The Contemporary Torah, JPS, 2006";
- 
-  const MAX_VERSES  = 30;
- 
+
+  const MAX_VERSE_HINT = 25;
+
   // ─── PRNG déterministe (mulberry32) ──────────────────────────────────────
- 
+
   function seededRng(seed) {
     let s = seed >>> 0;
     return function () {
@@ -44,26 +45,76 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
- 
+
   function dateToSeed(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
     return parseInt(`${y}${m}${d}`, 10);
   }
- 
+
+  // ─── Utilitaires date ─────────────────────────────────────────────────────
+
   function localMidnight(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
   }
- 
+
   function formatDateFr(date) {
     return date.toLocaleDateString("fr-FR", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      weekday: "long",
+      year:    "numeric",
+      month:   "long",
+      day:     "numeric",
     });
   }
- 
+
+  // ─── Nettoyage du texte Sefaria ───────────────────────────────────────────
+
+  /**
+   * Nettoie le texte renvoyé par Sefaria :
+   *  - Aplatit les tableaux imbriqués
+   *  - Retire les balises HTML (<b>, <i>, <span class="maqaf">…)
+   *  - Décode les entités HTML
+   *  - Retire les accents de cantillation (U+0591–U+05AF) qui provoquent
+   *    les sauts de ligne et décalages visuels signalés
+   *  - Garde le niqqud (voyelles U+05B0–U+05BD) pour la lisibilité
+   */
+  function cleanText(raw) {
+    if (!raw) return "";
+    if (Array.isArray(raw)) raw = raw.flat(Infinity).join(" ");
+
+    // Balises HTML → espace (évite de coller deux mots)
+    raw = raw.replace(/<[^>]+>/g, " ");
+
+    // Entités HTML
+    raw = raw
+      .replace(/&amp;/g,  "&")
+      .replace(/&lt;/g,   "<")
+      .replace(/&gt;/g,   ">")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&thinsp;/g, "\u2009")
+      .replace(/&#x[\da-fA-F]+;/g, (m) =>
+        String.fromCodePoint(parseInt(m.slice(3, -1), 16))
+      )
+      .replace(/&#\d+;/g, (m) =>
+        String.fromCodePoint(parseInt(m.slice(2, -1), 10))
+      );
+
+    // Accents de cantillation hébraïque U+0591–U+05AF
+    // + ponctuation massorétique problématique : maqaf U+05BE,
+    //   paseq U+05C0, sof pasuq U+05C3, nun hafukha U+05C6, U+05C7
+    raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
+
+    // Espaces multiples
+    raw = raw.replace(/\s{2,}/g, " ").trim();
+
+    return raw;
+  }
+
+  // ─── Sélection aléatoire du verset ───────────────────────────────────────
+
   function pickVerse(seed) {
     const rand = seededRng(seed);
     const totalChapters = TORAH_BOOKS.reduce((a, b) => a + b.chapters, 0);
@@ -74,183 +125,154 @@
       if (r <= 0) { book = b; break; }
     }
     const chapter = 1 + Math.floor(rand() * book.chapters);
-    const verse   = 1 + Math.floor(rand() * MAX_VERSES);
+    const verse   = 1 + Math.floor(rand() * MAX_VERSE_HINT);
     return { book: book.ref, chapter, verse };
   }
- 
-  // ─── Nettoyage du texte hébreu ────────────────────────────────────────────
-  // Supprime les accents de cantillation (te'amim, U+0591–U+05AF) qui causent
-  // des artefacts visuels dans la plupart des polices web, en conservant
-  // uniquement les consonnes et les points-voyelles (niqqud, U+05B0–U+05C7).
- 
-  function cleanHebrew(str) {
-    if (!str) return "";
-    return str
-      .replace(/[\u0591-\u05AF]/g, "")     // te'amim (cantillation)
-      .replace(/\u05BD/g, "")              // meteg
-      .replace(/\u05BF/g, "")              // rafe
-      .replace(/\u05C0/g, "")              // paseq
-      .replace(/\u05C6/g, "")              // nun hafukha
-      .replace(/[\u200B-\u200F\u200D]/g, " ") // zero-width / direction marks
-      .replace(/\s+/g, " ")
-      .trim();
-  }
- 
-  function stripHtml(str) {
-    if (!str) return "";
-    return str.replace(/<[^>]+>/g, "").trim();
-  }
- 
-  // ─── API Sefaria v3 ───────────────────────────────────────────────────────
- 
+
+  // ─── Appel API Sefaria v3 ─────────────────────────────────────────────────
+
+  /**
+   * Récupère hébreu + traduction FR (fallback EN) via l'API v3 de Sefaria.
+   * Un seul appel HTTP suffit grâce au paramètre version multiple.
+   * Si le verset est hors limites, on retente avec le verset 1.
+   */
   async function fetchVerse(book, chapter, verseHint) {
-    const ref = `${book} ${chapter}:${verseHint}`;
- 
-    const [heRes, frRes] = await Promise.all([
-      fetchVersion(ref, HE_VERSION),
-      fetchVersion(ref, FR_VERSION),
-    ]);
- 
-    // Si le verset hébreu est vide, le verset n'existe pas dans ce chapitre
-    if (!heRes.text) {
-      if (verseHint > 1) return fetchVerse(book, chapter, verseHint - 1);
-      throw new Error(`Verset introuvable : ${ref}`);
+    const ref = `${book}.${chapter}.${verseHint}`;
+    // Demande simultanément : hébreu massorétique, traduction FR, traduction EN
+    const params = new URLSearchParams();
+    params.append("version", "he|Miqra according to the Masorah");
+    params.append("version", "fr|La Bible d'André Chouraqui");
+    params.append("version", "en|The Contemporary Torah, Jewish Publication Society, 2006");
+    params.append("fill_in_missing_segments", "1");
+
+    const url = `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?${params}`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.versions || data.versions.length === 0) {
+      if (verseHint !== 1) return fetchVerse(book, chapter, 1);
+      throw new Error("Aucune version disponible.");
     }
- 
-    let translation = frRes.text;
-    let translationLang = "fr";
-    if (!translation) {
-      const enRes = await fetchVersion(ref, EN_FALLBACK);
-      translation = enRes.text;
-      translationLang = "en";
+
+    let heText = "";
+    let frText = "";
+    let enText = "";
+
+    for (const v of data.versions) {
+      const lang = (v.actualLanguage || v.language || "").toLowerCase();
+      const text = cleanText(v.text);
+      if (!text) continue;
+      if (lang === "he" && !heText) heText = text;
+      if (lang === "fr" && !frText) frText = text;
+      if (lang === "en" && !enText) enText = text;
     }
- 
-    return {
-      ref:             frRes.ref || heRes.ref || ref,
-      he:              cleanHebrew(heRes.text),
-      translation,
-      translationLang,
-      book,
-      chapter,
-      verse:           heRes.verse || verseHint,
-    };
+
+    // Verset inexistant → fallback v.1
+    if (!heText && verseHint !== 1) return fetchVerse(book, chapter, 1);
+
+    const translation     = frText || enText;
+    const translationLang = frText ? "fr" : (enText ? "en" : "");
+
+    // Numéro de verset réel
+    const realVerse = data.ref
+      ? (parseInt(data.ref.split(":").pop(), 10) ||
+         parseInt(data.ref.split(".").pop(), 10) ||
+         verseHint)
+      : verseHint;
+
+    return { book, chapter, verse: realVerse, he: heText, translation, translationLang };
   }
- 
-  async function fetchVersion(ref, version) {
-    const url =
-      "https://www.sefaria.org/api/v3/texts/" +
-      encodeURIComponent(ref) +
-      "?version=" + encodeURIComponent(version) +
-      "&fill_in_missing_segments=0";
- 
-    try {
-      const res  = await fetch(url);
-      if (!res.ok) return { text: "" };
-      const data = await res.json();
- 
-      const versions = data.versions || [];
-      if (!versions.length) return { text: "", ref: data.ref };
- 
-      let raw = versions[0].text;
-      if (Array.isArray(raw)) raw = raw.join(" ");
-      raw = stripHtml(raw || "");
- 
-      let verse = null;
-      if (data.ref) {
-        const m = data.ref.match(/:(\d+)$/);
-        if (m) verse = parseInt(m[1], 10);
-      }
- 
-      return { text: raw, ref: data.ref, verse };
-    } catch {
-      return { text: "" };
-    }
-  }
- 
+
   // ─── Rendu DOM ────────────────────────────────────────────────────────────
- 
+
   function el(id) { return document.getElementById(id); }
- 
-  function setLoading() {
-    el("tdj-date").textContent        = "Chargement\u2026";
-    el("tdj-ref").textContent         = "";
+
+  function setLoading(date) {
+    el("tdj-date").textContent        = formatDateFr(date);
+    el("tdj-ref").textContent         = "Chargement…";
     el("tdj-he").textContent          = "";
     el("tdj-translation").textContent = "";
-    el("tdj-tr-label").style.display  = "none";
+    el("tdj-label").style.display     = "none";
     el("tdj-error").style.display     = "none";
     el("tdj-content").classList.add("tdj-loading");
   }
- 
+
   function setError(msg) {
     el("tdj-error").textContent   = msg;
     el("tdj-error").style.display = "block";
+    el("tdj-ref").textContent     = "";
     el("tdj-content").classList.remove("tdj-loading");
-    el("tdj-date").textContent    = "";
   }
- 
-  function renderVerse(data, date) {
-    const bookFr   = BOOK_NAMES_FR[data.book] || data.book;
-    const langLabel = data.translationLang === "fr"
-      ? "Traduction\u00A0— André Chouraqui"
-      : "Traduction\u00A0— JPS 2006 (anglais)";
- 
+
+  function renderVerse(verseData, date) {
+    const bookFr    = BOOK_NAMES_FR[verseData.book] || verseData.book;
+    const langLabel = verseData.translationLang === "fr"
+      ? "Traduction française · André Chouraqui"
+      : "Traduction · anglais";
+
     el("tdj-date").textContent        = formatDateFr(date);
     el("tdj-ref").textContent         =
-      bookFr + "\u00A0\u2014 chapitre\u00A0" + data.chapter + ", verset\u00A0" + data.verse;
-    el("tdj-he").textContent          = data.he;
-    el("tdj-translation").textContent = data.translation || "Traduction indisponible.";
-    el("tdj-tr-label").textContent    = langLabel;
-    el("tdj-tr-label").style.display  = "block";
-    el("tdj-content").classList.remove("tdj-loading");
+      `${bookFr} — chapitre ${verseData.chapter}, verset ${verseData.verse}`;
+    el("tdj-he").textContent          = verseData.he;
+    el("tdj-translation").textContent = verseData.translation;
+    el("tdj-label").textContent       = langLabel;
+    el("tdj-label").style.display     = verseData.translation ? "block" : "none";
     el("tdj-error").style.display     = "none";
+    el("tdj-content").classList.remove("tdj-loading");
   }
- 
+
   // ─── Navigation ───────────────────────────────────────────────────────────
- 
-  let currentDate = localMidnight(new Date());
-  const today     = localMidnight(new Date());
- 
+
+  let currentDate;
+  let today;
+
+  function updateNavButtons(date) {
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    el("tdj-prev").disabled  = false;
+    el("tdj-next").disabled  = localMidnight(nextDay) > today;
+    el("tdj-today").disabled = date.getTime() === today.getTime();
+  }
+
   async function loadVerse(date) {
-    setLoading();
+    setLoading(date);
     updateNavButtons(date);
     const seed   = dateToSeed(date);
     const picked = pickVerse(seed);
     try {
-      const data = await fetchVerse(picked.book, picked.chapter, picked.verse);
-      renderVerse(data, date);
+      const verseData = await fetchVerse(picked.book, picked.chapter, picked.verse);
+      renderVerse(verseData, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
-      console.error("Sefaria error:", e);
+      console.error("[torah-du-jour]", e);
     }
   }
- 
-  function updateNavButtons(date) {
-    const next = new Date(date);
-    next.setDate(next.getDate() + 1);
-    el("tdj-next").disabled  = localMidnight(next) > today;
-    el("tdj-today").disabled = date.getTime() === today.getTime();
-  }
- 
+
   function navigate(deltaDays) {
     const next = new Date(currentDate);
     next.setDate(next.getDate() + deltaDays);
-    const m = localMidnight(next);
-    if (m > today) return;
-    currentDate = m;
+    const nextMidnight = localMidnight(next);
+    if (nextMidnight > today) return;
+    currentDate = nextMidnight;
     loadVerse(currentDate);
   }
- 
+
   // ─── Init ─────────────────────────────────────────────────────────────────
- 
+
   document.addEventListener("DOMContentLoaded", function () {
+    today       = localMidnight(new Date());
+    currentDate = localMidnight(new Date());
+
     el("tdj-prev").addEventListener("click",  () => navigate(-1));
     el("tdj-next").addEventListener("click",  () => navigate(+1));
     el("tdj-today").addEventListener("click", () => {
       currentDate = localMidnight(new Date());
       loadVerse(currentDate);
     });
+
     loadVerse(currentDate);
   });
- 
+
 })();
- 
