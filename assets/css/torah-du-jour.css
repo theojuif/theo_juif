@@ -1,104 +1,170 @@
-```css
-/* ── Bloc principal ───────────────────────── */
+/* ============================================================
+   torah-du-jour.css
+   Styles pour la page "Verset du jour"
+   Compatible avec le thème HTML5 UP Landed
+   ============================================================ */
+
+/* ── Carte principale ──────────────────────────────────────── */
 
 #tdj-wrapper {
 	margin: 2em 0;
 }
 
 .tdj-card {
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-radius: 8px;
-	padding: 2em;
+	border: 1px solid rgba(255, 255, 255, 0.10);
+	border-radius: 6px;
+	padding: 2em 2.5em;
 	transition: opacity 0.3s ease;
 }
 
 .tdj-card.tdj-loading {
-	opacity: 0.5;
+	opacity: 0.40;
 	pointer-events: none;
 }
 
-/* ── Texte ───────────────────────── */
+/* ── En-tête de la carte ───────────────────────────────────── */
 
 .tdj-date {
-	font-size: 0.85em;
-	opacity: 0.6;
-	margin-bottom: 0.5em;
+	font-size: 0.82em;
+	text-transform: uppercase;
+	letter-spacing: 0.13em;
+	opacity: 0.50;
+	margin-bottom: 0.3em;
 }
 
 .tdj-ref {
-	font-weight: bold;
-	margin-bottom: 1em;
+	font-size: 1.05em;
+	font-weight: 600;
+	margin-bottom: 1.6em;
+	opacity: 0.80;
 }
+
+/* ── Texte hébreu ──────────────────────────────────────────── */
 
 .tdj-hebrew {
-	font-size: 1.5em;
-	line-height: 1.8;
+	font-size: 1.55em;
+	line-height: 2.1;
 	text-align: right;
 	direction: rtl;
-	margin-bottom: 1em;
-	border-right: 3px solid #ccc;
-	padding-right: 10px;
+	/* Police serif avec bon support Unicode pour les points voyelles et les
+	   accents de cantillation (טעמים). On liste plusieurs polices pour
+	   maximiser la compatibilité cross-OS. */
+	font-family: "Ezra SIL", "SBL Hebrew", "David", "Times New Roman", serif;
+	margin-bottom: 1.6em;
+	padding-right: 1.1em;
+	border-right: 3px solid rgba(255, 255, 255, 0.25);
+	/* Ligatures et kerning adaptés à l'hébreu */
+	-webkit-font-feature-settings: "kern" 1, "liga" 1;
+	font-feature-settings: "kern" 1, "liga" 1;
+	/* Évite les coupures de mots en milieu de mot hébreu */
+	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
+
+/* ── Traduction française ──────────────────────────────────── */
 
 .tdj-label {
-	font-size: 0.75em;
-	opacity: 0.5;
-	margin-bottom: 0.3em;
-	display: none;
+	font-size: 0.72em;
+	text-transform: uppercase;
+	letter-spacing: 0.10em;
+	opacity: 0.38;
+	margin-bottom: 0.5em;
 }
 
-.tdj-translation {
+.tdj-french {
+	font-size: 1.20em;
+	line-height: 1.80;
 	font-style: italic;
-	opacity: 0.8;
+	opacity: 0.88;
+	margin-bottom: 0;
 }
 
-/* ── Navigation ───────────────────────── */
-
-.tdj-nav {
-	display: flex;
-	gap: 10px;
-	margin-top: 20px;
-}
-
-.tdj-nav button {
-	padding: 6px 12px;
-	cursor: pointer;
-}
-
-.tdj-nav button:disabled {
-	opacity: 0.4;
-	cursor: not-allowed;
-}
-
-/* ── Erreur ───────────────────────── */
+/* ── Message d'erreur ──────────────────────────────────────── */
 
 .tdj-error {
 	display: none;
-	color: red;
-	margin-top: 10px;
+	color: #e07070;
+	background: rgba(220, 60, 60, 0.07);
+	border: 1px solid rgba(220, 60, 60, 0.22);
+	border-radius: 4px;
+	padding: 0.85em 1.2em;
+	font-size: 0.88em;
+	margin-top: 1em;
 }
 
-/* ── Spinner ───────────────────────── */
+/* ── Navigation entre les jours ────────────────────────────── */
+
+.tdj-nav {
+	display: flex;
+	align-items: center;
+	gap: 0.75em;
+	margin-top: 1.8em;
+	flex-wrap: wrap;
+}
+
+.tdj-nav .button {
+	transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.tdj-nav .button:disabled {
+	opacity: 0.28;
+	cursor: not-allowed;
+	transform: none !important;
+	pointer-events: none;
+}
+
+.tdj-nav .button:not(:disabled):hover {
+	transform: translateY(-1px);
+}
+
+#tdj-today {
+	margin-left: auto;
+}
+
+/* ── Animation de chargement ───────────────────────────────── */
+
+@keyframes tdj-spin {
+	to { transform: rotate(360deg); }
+}
 
 .tdj-spinner {
 	display: none;
 	width: 14px;
 	height: 14px;
-	border: 2px solid #ccc;
-	border-top: 2px solid #000;
+	border: 2px solid rgba(255, 255, 255, 0.18);
+	border-top-color: rgba(255, 255, 255, 0.72);
 	border-radius: 50%;
-	animation: spin 0.7s linear infinite;
-	margin-right: 5px;
+	animation: tdj-spin 0.75s linear infinite;
+	vertical-align: middle;
+	margin-right: 0.5em;
 }
 
 .tdj-loading .tdj-spinner {
 	display: inline-block;
 }
 
-@keyframes spin {
-	to {
-		transform: rotate(360deg);
+/* ── Responsive ────────────────────────────────────────────── */
+
+@media screen and (max-width: 640px) {
+	.tdj-card {
+		padding: 1.4em 1.2em;
+	}
+
+	.tdj-hebrew {
+		font-size: 1.25em;
+		line-height: 2.0;
+	}
+
+	.tdj-french {
+		font-size: 1.05em;
+	}
+
+	.tdj-nav {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	#tdj-today {
+		margin-left: 0;
 	}
 }
-```
