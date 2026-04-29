@@ -179,14 +179,26 @@
   }
 
   function renderVerse(v, date) {
+    const bookFr = BOOK_NAMES_FR[v.book.name] || v.book.name;
+    const bookShort = bookFr.split(" · ")[1] || bookFr;
+
     el("tdj-date").textContent        = formatDateFr(date);
     el("tdj-ref").textContent         =
-      `${BOOK_NAMES_FR[v.book.name] || v.book.name} — chapitre ${v.chapter}, verset ${v.verseNumber}`;
+      `${bookFr} — chapitre ${v.chapter}, verset ${v.verseNumber}`;
     el("tdj-he").textContent          = v.he;
     el("tdj-translation").textContent = v.fr;
-    el("tdj-label").textContent       = "Traduction française · A.P.E.E.";
+    el("tdj-label").textContent       = "Traduction française";
     el("tdj-label").style.display     = "block";
     el("tdj-error").style.display     = "none";
+
+    // Lien de contexte vers Sefaria
+    const linkEl = el("tdj-context-link");
+    if (linkEl) {
+      linkEl.href        = `https://www.sefaria.org/${v.book.sefariaRef}.${v.chapter}.${v.verseNumber}?lang=bi`;
+      linkEl.textContent = `Lire ${bookShort} ${v.chapter} en contexte →`;
+      linkEl.style.display = "inline";
+    }
+
     el("tdj-content").classList.remove("tdj-loading");
   }
 
