@@ -2,49 +2,26 @@
  * torah-du-jour.js
  *
  * Sources :
- *  - Français : bolls.life /get-text/LSG/{book}/{chapter}/{verse}/
- *  - Hébreu   : Sefaria API v2 (optionnel)
+ *  - Français : fr_apee.json (chargé localement, zéro dépendance externe)
+ *    Structure : array[bookIndex].chapters[chapterIndex][verseIndex]
+ *    Livres Torah : index 0=Genèse, 1=Exode, 2=Lévitique, 3=Nombres, 4=Deutéronome
  *
- * Le nombre exact de versets par chapitre est embarqué dans le code
- * → aucune chance de demander un verset hors limites.
+ *  - Hébreu : Sefaria API v2 (optionnel, ne bloque jamais)
+ *
+ * Seed déterministe : même date → même verset. Jours futurs bloqués.
  */
 
 (function () {
   "use strict";
 
-  // ─── Nombre de versets par chapitre (Torah complète) ──────────────────────
-  // Source : https://www.sefaria.org (comptage massorétique standard)
-  // Format : VERSES[bollsBookNumber] = [v_ch1, v_ch2, ...]
-  const VERSES = {
-    1: [ // Genèse
-      31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,
-      34,24,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,
-      57,38,34,34,28,34,31,22,33,26
-    ],
-    2: [ // Exode
-      22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,
-      36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38
-    ],
-    3: [ // Lévitique
-      17,16,17,35,19,30,38,36,24,20,47, 8,59,57,33,34,16,30,24,33,
-      3,49,17,10,22,28,23,51,31,30,32,22,31,19,39,12,25,23,29
-    ],
-    4: [ // Nombres
-      54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,
-      35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13
-    ],
-    5: [ // Deutéronome
-      46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,
-      23,30,25,22,19,19,26,68,29,20,30,52,29,12
-    ],
-  };
+  // ─── Configuration ────────────────────────────────────────────────────────
 
   const TORAH_BOOKS = [
-    { name: "Genesis",     bollsBook: 1, sefariaRef: "Genesis"    },
-    { name: "Exodus",      bollsBook: 2, sefariaRef: "Exodus"     },
-    { name: "Leviticus",   bollsBook: 3, sefariaRef: "Leviticus"  },
-    { name: "Numbers",     bollsBook: 4, sefariaRef: "Numbers"    },
-    { name: "Deuteronomy", bollsBook: 5, sefariaRef: "Deuteronomy"},
+    { name: "Genesis",     jsonIndex: 0, sefariaRef: "Genesis"     },
+    { name: "Exodus",      jsonIndex: 1, sefariaRef: "Exodus"      },
+    { name: "Leviticus",   jsonIndex: 2, sefariaRef: "Leviticus"   },
+    { name: "Numbers",     jsonIndex: 3, sefariaRef: "Numbers"     },
+    { name: "Deuteronomy", jsonIndex: 4, sefariaRef: "Deuteronomy" },
   ];
 
   const BOOK_NAMES_FR = {
@@ -54,6 +31,12 @@
     Numbers:     "Bamidbar · Nombres",
     Deuteronomy: "Devarim · Deutéronome",
   };
+
+  // Chemin vers le fichier JSON (même dossier que ce script)
+  const JSON_URL = "assets/js/fr_apee.json";
+
+  // Cache du JSON pour éviter de le recharger à chaque navigation
+  let bibleData = null;
 
   // ─── PRNG déterministe (mulberry32) ──────────────────────────────────────
 
@@ -88,12 +71,7 @@
     });
   }
 
-  // ─── Nettoyage texte ──────────────────────────────────────────────────────
-
-  function stripHtml(raw) {
-    if (!raw) return "";
-    return raw.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
-  }
+  // ─── Nettoyage hébreu Sefaria ─────────────────────────────────────────────
 
   function cleanHebrew(raw) {
     if (!raw) return "";
@@ -104,54 +82,65 @@
       .replace(/&nbsp;/g, " ").replace(/&thinsp;/g, "\u2009")
       .replace(/&#x[\da-fA-F]+;/g, m => String.fromCodePoint(parseInt(m.slice(3,-1), 16)))
       .replace(/&#\d+;/g,           m => String.fromCodePoint(parseInt(m.slice(2,-1), 10)));
+    // Retire cantillations (U+0591–U+05AF) et ponctuation massorétique parasites
     raw = raw.replace(/[\u0591-\u05AF\u05BE\u05C0\u05C3\u05C6\u05C7]/g, "");
     return raw.replace(/\s{2,}/g, " ").trim();
   }
 
-  // ─── Sélection déterministe ───────────────────────────────────────────────
+  // ─── Chargement du JSON local ─────────────────────────────────────────────
 
-  function pickTarget(seed) {
-    const rand = seededRng(seed);
-
-    // Choisir un livre proportionnellement au nombre total de versets
-    const totalVerses = Object.values(VERSES).reduce(
-      (sum, chapters) => sum + chapters.reduce((a, b) => a + b, 0), 0
-    );
-    let r = rand() * totalVerses;
-    let chosenBook = TORAH_BOOKS[TORAH_BOOKS.length - 1];
-    for (const book of TORAH_BOOKS) {
-      const bookTotal = VERSES[book.bollsBook].reduce((a, b) => a + b, 0);
-      r -= bookTotal;
-      if (r <= 0) { chosenBook = book; break; }
-    }
-
-    // Choisir un chapitre proportionnellement au nombre de versets
-    const chapVerses = VERSES[chosenBook.bollsBook];
-    const chTotal    = chapVerses.reduce((a, b) => a + b, 0);
-    let rv = rand() * chTotal;
-    let chapter = chapVerses.length; // fallback = dernier chapitre
-    for (let i = 0; i < chapVerses.length; i++) {
-      rv -= chapVerses[i];
-      if (rv <= 0) { chapter = i + 1; break; }
-    }
-
-    // Choisir un verset — index garanti dans les limites
-    const maxVerse = chapVerses[chapter - 1];
-    const verse    = 1 + Math.floor(rand() * maxVerse);
-
-    return { book: chosenBook, chapter, verse };
+  async function loadBibleData() {
+    if (bibleData) return bibleData;
+    const res = await fetch(JSON_URL);
+    if (!res.ok) throw new Error(`Impossible de charger ${JSON_URL} (HTTP ${res.status})`);
+    bibleData = await res.json();
+    return bibleData;
   }
 
-  // ─── API bolls.life ───────────────────────────────────────────────────────
+  // ─── Sélection déterministe ───────────────────────────────────────────────
 
-  async function fetchFrench(bollsBook, chapter, verse) {
-    const url = `https://bolls.life/get-text/LSG/${bollsBook}/${chapter}/${verse}/`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`bolls.life HTTP ${res.status}`);
-    const data = await res.json();
-    const text = stripHtml(data.text || "");
-    if (!text) throw new Error("Texte vide (LSG).");
-    return { verseNumber: data.verse || verse, text };
+  /**
+   * Utilise les vraies données du JSON pour calculer les proportions.
+   * Aucun risque d'index hors limites.
+   */
+  function pickTarget(seed, bible) {
+    const rand = seededRng(seed);
+
+    // Compter le total de versets dans la Torah (5 premiers livres)
+    let totalVerses = 0;
+    for (const book of TORAH_BOOKS) {
+      for (const chapter of bible[book.jsonIndex].chapters) {
+        totalVerses += chapter.length;
+      }
+    }
+
+    // Choisir un verset par position absolue
+    let pos = Math.floor(rand() * totalVerses);
+
+    for (const book of TORAH_BOOKS) {
+      const chapters = bible[book.jsonIndex].chapters;
+      for (let ci = 0; ci < chapters.length; ci++) {
+        if (pos < chapters[ci].length) {
+          return {
+            book,
+            chapter:    ci + 1,           // 1-based
+            verseIndex: pos,              // 0-based dans le tableau
+            verseNumber: pos + 1,         // 1-based pour l'affichage / Sefaria
+          };
+        }
+        pos -= chapters[ci].length;
+      }
+    }
+
+    // Fallback (ne devrait jamais arriver)
+    return { book: TORAH_BOOKS[0], chapter: 1, verseIndex: 0, verseNumber: 1 };
+  }
+
+  // ─── Récupération du texte français ──────────────────────────────────────
+
+  function getFrenchVerse(bible, bookJsonIndex, chapter, verseIndex) {
+    const text = bible[bookJsonIndex].chapters[chapter - 1][verseIndex];
+    return text || "";
   }
 
   // ─── API Sefaria (hébreu, optionnel) ─────────────────────────────────────
@@ -166,14 +155,6 @@
       if (data.error) return "";
       return cleanHebrew(data.he) || "";
     } catch (_) { return ""; }
-  }
-
-  // ─── Orchestration ────────────────────────────────────────────────────────
-
-  async function fetchVerse(book, chapter, verse) {
-    const fr     = await fetchFrench(book.bollsBook, chapter, verse);
-    const heText = await fetchHebrew(book.sefariaRef, chapter, fr.verseNumber);
-    return { book: book.name, chapter, verse: fr.verseNumber, he: heText, fr: fr.text };
   }
 
   // ─── DOM ──────────────────────────────────────────────────────────────────
@@ -200,10 +181,10 @@
   function renderVerse(v, date) {
     el("tdj-date").textContent        = formatDateFr(date);
     el("tdj-ref").textContent         =
-      `${BOOK_NAMES_FR[v.book] || v.book} — chapitre ${v.chapter}, verset ${v.verse}`;
+      `${BOOK_NAMES_FR[v.book.name] || v.book.name} — chapitre ${v.chapter}, verset ${v.verseNumber}`;
     el("tdj-he").textContent          = v.he;
     el("tdj-translation").textContent = v.fr;
-    el("tdj-label").textContent       = "Traduction française · Louis Segond 1910";
+    el("tdj-label").textContent       = "Traduction française · A.P.E.E.";
     el("tdj-label").style.display     = "block";
     el("tdj-error").style.display     = "none";
     el("tdj-content").classList.remove("tdj-loading");
@@ -224,10 +205,12 @@
   async function loadVerse(date) {
     setLoading(date);
     updateNavButtons(date);
-    const { book, chapter, verse } = pickTarget(dateToSeed(date));
     try {
-      const verseData = await fetchVerse(book, chapter, verse);
-      renderVerse(verseData, date);
+      const bible  = await loadBibleData();
+      const target = pickTarget(dateToSeed(date), bible);
+      const frText = getFrenchVerse(bible, target.book.jsonIndex, target.chapter, target.verseIndex);
+      const heText = await fetchHebrew(target.book.sefariaRef, target.chapter, target.verseNumber);
+      renderVerse({ book: target.book, chapter: target.chapter, verseNumber: target.verseNumber, fr: frText, he: heText }, date);
     } catch (e) {
       setError("Impossible de charger le verset. Vérifiez votre connexion et rechargez la page.");
       console.error("[torah-du-jour]", e);
