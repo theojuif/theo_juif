@@ -195,7 +195,7 @@
     const linkEl = el("tdj-context-link");
     if (linkEl) {
       linkEl.href        = `https://www.sefaria.org/${v.book.sefariaRef}.${v.chapter}.${v.verseNumber}?lang=bi`;
-      linkEl.textContent = `Lire ${bookShort} ${v.chapter} en contexte →`;
+      linkEl.textContent = `Lire ${bookShort} ${v.chapter} sur Sefaria →`;
       linkEl.style.display = "inline";
     }
 
