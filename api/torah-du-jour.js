@@ -1,3 +1,5 @@
+// api/torah-du-jour.js
+//
 // Endpoint API : GET /api/torah-du-jour
 // Renvoie le verset du jour au format JSON.
 //
@@ -6,9 +8,10 @@
 //
 // Réutilise exactement le même algorithme déterministe que assets/js/torah-du-jour.js
 // (même seed = même verset, que ce soit calculé côté navigateur ou ici côté serveur).
-
-const fs = require('fs');
-const path = require('path');
+//
+// Déploiement : sur Vercel, tout fichier placé dans /api à la racine du projet
+// devient automatiquement une fonction serverless accessible à
+// https://tonsite.vercel.app/api/torah-du-jour — aucune config supplémentaire.
 
 // ─── Configuration (identique à torah-du-jour.js) ──────────────────────────
 
@@ -28,14 +31,13 @@ const BOOK_NAMES_FR = {
   Deuteronomy: "Devarim · Deutéronome",
 };
 
-let bibleCache = null;
+// require() sur un .json est détecté par Vercel à la construction du bundle
+// (contrairement à un chemin lu dynamiquement via fs), donc le fichier est
+// automatiquement embarqué avec la fonction serverless.
+const bibleData = require('../assets/js/fr_apee.json');
 
 function loadBibleData() {
-  if (bibleCache) return bibleCache;
-  const filePath = path.join(process.cwd(), 'assets', 'js', 'fr_apee.json');
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  bibleCache = JSON.parse(raw);
-  return bibleCache;
+  return bibleData;
 }
 
 // ─── PRNG déterministe (mulberry32) — identique au script client ──────────
@@ -181,6 +183,8 @@ module.exports = async function handler(req, res) {
     });
   } catch (e) {
     console.error('[api/torah-du-jour]', e);
-    res.status(500).json({ error: "Erreur serveur lors du calcul du verset." });
+    const payload = { error: "Erreur serveur lors du calcul du verset." };
+    if (req.query.debug === '1') payload.detail = e.message;
+    res.status(500).json(payload);
   }
 };
