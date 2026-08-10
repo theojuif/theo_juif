@@ -25,8 +25,22 @@
 				</nav>
 			</header>
 
-			<!-- ===== SECTION TEMPORAIRE - VOTE BILLETS - A SUPPRIMER APRES ===== -->
-<section id="vote-billets" style="background:#1a1a1a; padding: 1em 1.5em; text-align:center;">
+<!-- ===== SECTION TEMPORAIRE - VOTE BILLETS - A SUPPRIMER APRES ===== -->
+<style>
+	#vote-billets {
+		background: #1a1a1a;
+		padding: 1em 1.5em;
+		text-align: center;
+		position: relative;
+		z-index: 5;
+	}
+	@media screen and (min-width: 737px) {
+		#vote-billets {
+			margin-top: 3.5em; /* évite le chevauchement avec le header flottant */
+		}
+	}
+</style>
+<section id="vote-billets">
 	<p style="margin:0; color:#fff;">
 		🗳️ Votez pour nos billets sur le site de la 
 		<a href="https://www.ecb.europa.eu/" target="_blank" rel="noopener noreferrer" style="color:#f9d423; text-decoration:underline;">
