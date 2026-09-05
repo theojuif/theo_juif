@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   today.setHours(0, 0, 0, 0);
 
   const diffDays =
-    Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 2;
+    Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) ;
 
   document.getElementById("duolingo-count").textContent = diffDays;
 });
